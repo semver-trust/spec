@@ -26,7 +26,7 @@ jobs:
       - name: Setup Python
         run: |
           uv sync --group dev --no-install-project
-          source .venv/bin/activate
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Lint
         run: |
