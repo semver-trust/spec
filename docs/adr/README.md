@@ -25,6 +25,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-017 | [Roadmap reorders around demand side artifacts and keystone instrumentation](0017-roadmap-reorders-around-demand-side-artifacts-and-keystone-instrumentation.md) | Accepted (2026-07-04) |
 | ADR-018 | [Verification interfaces accept injectable trust roots and clock from day one](0018-verification-interfaces-accept-injectable-trust-roots-and-clock-from-day-one.md) | Accepted (2026-07-04) |
 | ADR-019 | [Trust levels order accountability not risk](0019-trust-levels-order-accountability-not-risk.md) | Accepted (2026-07-04) |
+| ADR-020 | [Incorporate go-semver as reviewed re-commits](0020-incorporate-go-semver-as-reviewed-re-commits.md) | Accepted (2026-07-06) |
 
 ## Adding an ADR
 
