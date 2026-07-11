@@ -12,7 +12,10 @@ it. The vectors in this directory cover **level assignment** (§3.2, §3.3, §4.
 and tag grammar** (§7.1, §7.2), **aggregation** (§5.1–§5.2 scope partitioning and floors, §5.4 meta-paths,
 with §4.4 derivation re-leveling as it feeds §5.2), **transitive propagation** (§5.3, including SCC
 collapse), and **release decisions** (§6.1–§6.4 with §7.1 encoding). Every step of the spec's Appendix A
-worked example is reproduced as a vector (ids containing `appendix-a`).
+worked example is reproduced as a vector (ids containing `appendix-a`). Cryptographic verification fixtures —
+vendored test keys, the allowed-signers registry, deterministically built fixture repositories, and SSH
+signature vectors (§4.2, §10 step 3) — live under [`crypto/`](crypto/README.md), which also documents the v1
+capability limitation (SSH-only, with fail-closed behavior on other key families proven by vector).
 
 ## File inventory
 
@@ -23,6 +26,7 @@ worked example is reproduced as a vector (ids containing `appendix-a`).
 | `aggregation.json` | Scope partitioning, per-scope floor, and meta-path hard-fail vectors | Apache 2.0 |
 | `propagation.json` | Effective-trust propagation vectors over dependency graphs (incl. SCCs) | Apache 2.0 |
 | `decision.json` | §6.4 decision-table vectors: trust × blast × strategy → channel/version | Apache 2.0 |
+| `crypto/` | Cryptographic fixtures: vendored test keys, allowed-signers registry, deterministic fixture-repo builder, SSH signature vectors (see `crypto/README.md`) | Apache 2.0 |
 | `check-conformance.py` (in `../scripts/`) | Independent validator for these files (self-check, not the harness) | Apache 2.0 |
 | `LICENSE` | Verbatim Apache 2.0 text, vendored so copies carry their license | Apache 2.0 |
 

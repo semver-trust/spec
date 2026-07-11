@@ -30,7 +30,8 @@ PRECEDENCE = CONFORMANCE / "precedence.json"
 AGGREGATION = CONFORMANCE / "aggregation.json"
 PROPAGATION = CONFORMANCE / "propagation.json"
 DECISION = CONFORMANCE / "decision.json"
-VECTOR_FILES = (LEVELS, PRECEDENCE, AGGREGATION, PROPAGATION, DECISION)
+SIGNATURE = CONFORMANCE / "crypto" / "signature-vectors.json"
+VECTOR_FILES = (LEVELS, PRECEDENCE, AGGREGATION, PROPAGATION, DECISION, SIGNATURE)
 SPEC = ROOT / "spec" / "semver-trust.md"
 
 AUTHORSHIP = ("agent", "mixed", "ambiguous", "human")

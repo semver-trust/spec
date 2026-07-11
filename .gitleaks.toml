@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Secret-scanning configuration. The only allowlisted paths are the
+# conformance test keys, whose private halves are committed on purpose as
+# clearly-labeled test doubles (docs/conformance-crypto-fixtures.md §2.4:
+# scanner allowlisting is explicit, not silent). Every such key's comment
+# contains "semver-trust-conformance TEST KEY - DO NOT USE", every identity
+# lives in the RFC 6761-reserved .test domain, and none is enrolled in any
+# real trust anchor.
+
+title = "semver-trust/spec gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Vendored conformance test keys — intentional test material, not secrets"
+paths = ['''conformance/crypto/keys/.*''']
