@@ -33,5 +33,9 @@ jobs:
           task lint
 
       - name: Check for drift
-        run: |-
+        run: |
           python3 scripts/check-drift.py
+
+      - name: Check conformance vectors
+        run: |-
+          python3 scripts/check-conformance.py

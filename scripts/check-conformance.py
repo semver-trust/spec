@@ -2,13 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 """check-conformance.py — independent validation of the SemVer-Trust conformance vectors.
 
-Validates ``conformance/levels.json`` and ``conformance/precedence.json`` against a
-second, independent implementation of the spec rules they encode
-(``spec/semver-trust.md`` §3.2-§3.3, §4.1-§4.2, §7.1-§7.2). This is deliberately NOT
-the reference Go implementation, and it shares no code with
-``scripts/check-drift.py`` — the SemVer comparator and the level invariant are
-re-implemented here from first principles. Agreement between two independent
-implementations is the point.
+Validates ``conformance/levels.json``, ``conformance/precedence.json``,
+``conformance/aggregation.json``, ``conformance/propagation.json``, and
+``conformance/decision.json`` against a second, independent implementation of the
+spec rules they encode (``spec/semver-trust.md`` §3.2-§3.3, §4.1-§4.2, §5.1-§5.4,
+§6.1-§6.4, §7.1-§7.2, Appendix A). This is deliberately NOT the reference Go
+implementation, and it shares no code with ``scripts/check-drift.py`` — the SemVer
+comparator, the level invariant, the scope/floor/propagation arithmetic, and the
+decision table are re-implemented here from first principles. Agreement between two
+independent implementations is the point.
 
     python3 scripts/check-conformance.py
 
@@ -25,10 +27,16 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFORMANCE = ROOT / "conformance"
 LEVELS = CONFORMANCE / "levels.json"
 PRECEDENCE = CONFORMANCE / "precedence.json"
+AGGREGATION = CONFORMANCE / "aggregation.json"
+PROPAGATION = CONFORMANCE / "propagation.json"
+DECISION = CONFORMANCE / "decision.json"
+VECTOR_FILES = (LEVELS, PRECEDENCE, AGGREGATION, PROPAGATION, DECISION)
 SPEC = ROOT / "spec" / "semver-trust.md"
 
 AUTHORSHIP = ("agent", "mixed", "ambiguous", "human")
 REVIEW = ("none", "agent_independent", "human_distinct")
+LEVEL_RANK = {"T0": 0, "T1": 1, "T2": 2, "T3": 3}
+BUMP_RANK = {"patch": 0, "minor": 1, "major": 2}
 
 failures: list[str] = []
 
@@ -92,6 +100,192 @@ _SEMVER_TAG = re.compile(
     r"v(?P<core>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))"
     r"(?:-(?P<pre>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z.-]+)?$"
 )
+
+
+# §5.1 scope globs, gitignore-style segments: '*' stays inside a path segment,
+# '**' crosses segments. Segment-aware on purpose: services/auth/** must not
+# match services/authz/….
+def _glob_to_re(pattern: str) -> re.Pattern:
+    out, i = [], 0
+    while i < len(pattern):
+        if pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif pattern[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif pattern[i] == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(pattern[i]))
+            i += 1
+    return re.compile("^" + "".join(out) + "$")
+
+
+def _scopes_of(path: str, compiled: list[tuple[re.Pattern, str]]) -> set[str]:
+    touched = {scope for rx, scope in compiled if rx.match(path)}
+    return touched or {"default"}  # §5.1: unmatched paths fall to the implicit default scope
+
+
+# Per-path contributed level, after §4.4: a verified derivation re-levels exactly
+# its declared output paths to the inputs' floor; a failed proof is void.
+def _path_level(commit: dict, path: str) -> str:
+    deriv = commit.get("derivation")
+    if deriv and deriv["verified"] and any(_glob_to_re(g).match(path) for g in deriv["outputs"]):
+        return deriv["inherited_level"]
+    return commit["level"]
+
+
+def _partition(scopes: dict[str, str], commits: list[dict]) -> dict[str, list[str]]:
+    compiled = [(_glob_to_re(g), name) for g, name in scopes.items()]
+    result: dict[str, list[str]] = {}
+    for commit in commits:
+        touched: set[str] = set()
+        for path in commit["paths"]:
+            touched |= _scopes_of(path, compiled)
+        for scope in touched:
+            result.setdefault(scope, []).append(commit["id"])
+    return result
+
+
+# §5.2: own_trust(scope) = min over commits touching the scope of level(c),
+# levels taken per path after derivation re-leveling (§4.4).
+def _floors(scopes: dict[str, str], commits: list[dict]) -> dict[str, str]:
+    compiled = [(_glob_to_re(g), name) for g, name in scopes.items()]
+    floors: dict[str, int] = {}
+    for commit in commits:
+        for path in commit["paths"]:
+            rank = LEVEL_RANK[_path_level(commit, path)]
+            for scope in _scopes_of(path, compiled):
+                floors[scope] = min(floors.get(scope, 3), rank)
+    return {scope: f"T{rank}" for scope, rank in floors.items()}
+
+
+def _edges_to_adj(edges: list[list[str]]) -> dict[str, list[str]]:
+    adj: dict[str, list[str]] = {}
+    for consumer, dependency in edges:
+        adj.setdefault(consumer, []).append(dependency)
+    return adj
+
+
+# Tarjan SCC over the dependency graph (edges point consumer -> dependency).
+def _sccs(nodes: list[str], adj: dict[str, list[str]]) -> dict[str, int]:
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    on_stack: set[str] = set()
+    stack: list[str] = []
+    scc_of: dict[str, int] = {}
+    counter = [0, 0]  # next index, next scc id
+
+    def visit(v: str) -> None:
+        index[v] = low[v] = counter[0]
+        counter[0] += 1
+        stack.append(v)
+        on_stack.add(v)
+        for w in adj.get(v, []):
+            if w not in index:
+                visit(w)
+                low[v] = min(low[v], low[w])
+            elif w in on_stack:
+                low[v] = min(low[v], index[w])
+        if low[v] == index[v]:
+            while True:
+                w = stack.pop()
+                on_stack.discard(w)
+                scc_of[w] = counter[1]
+                if w == v:
+                    break
+            counter[1] += 1
+
+    for v in nodes:
+        if v not in index:
+            visit(v)
+    return scc_of
+
+
+# §5.3: effective(C) = min(own(C), min over deps D of effective(D)), with cycles
+# collapsed to their SCC (every member shares the SCC's minimum own trust).
+def _effective(own: dict[str, str], edges: list[list[str]]) -> dict[str, str]:
+    scc_of = _sccs(list(own), _edges_to_adj(edges))
+    scc_own: dict[int, int] = {}
+    for node, scc in scc_of.items():
+        scc_own[scc] = min(scc_own.get(scc, 3), LEVEL_RANK[own[node]])
+    scc_adj: dict[int, set[int]] = {}
+    for consumer, dependency in edges:
+        a, b = scc_of[consumer], scc_of[dependency]
+        if a != b:
+            scc_adj.setdefault(a, set()).add(b)
+    memo: dict[int, int] = {}
+
+    def eff(scc: int) -> int:
+        if scc not in memo:
+            memo[scc] = min(
+                [scc_own[scc]] + [eff(dep) for dep in scc_adj.get(scc, ())],
+            )
+        return memo[scc]
+
+    return {node: f"T{eff(scc_of[node])}" for node in own}
+
+
+def _reachable(start: str, edges: list[list[str]]) -> set[str]:
+    adj = _edges_to_adj(edges)
+    seen, frontier = {start}, [start]
+    while frontier:
+        for nxt in adj.get(frontier.pop(), []):
+            if nxt not in seen:
+                seen.add(nxt)
+                frontier.append(nxt)
+    return seen
+
+
+# §6.4 default decision table. Cell values: the clean channel is available
+# unconditionally, conditioned on a differ proof for PATCH claims, conditioned
+# on a differ proof for any claim (the T1/low cell), or unavailable.
+_TABLE = {
+    ("T3", "low"): "clean",
+    ("T3", "moderate"): "clean",
+    ("T3", "high"): "differ_patch",
+    ("T2", "low"): "clean",
+    ("T2", "moderate"): "differ_patch",
+    ("T2", "high"): "prerelease",
+    ("T1", "low"): "differ_any",
+    ("T1", "moderate"): "prerelease",
+    ("T1", "high"): "prerelease",
+    ("T0", "low"): "prerelease",
+    ("T0", "moderate"): "prerelease",
+    ("T0", "high"): "prerelease",
+}
+
+
+def _decide(inputs: dict) -> dict:
+    cell = _TABLE[(inputs["effective_trust"], inputs["blast"])]
+    bump = max(inputs["claimed_bump"], inputs["semantic_floor"], key=BUMP_RANK.__getitem__)
+    differ_needed = cell == "differ_any" or (cell == "differ_patch" and bump == "patch")
+    demoted = cell == "prerelease" or (differ_needed and not inputs["differ_available"])
+
+    m = _TRUST_TAG.match(inputs["current_version"])
+    if m is None or m["level"] is not None:
+        raise ValueError(f"current_version must be a clean §7.1 tag: {inputs['current_version']}")
+    major, minor, patch = (int(x) for x in m["core"].split("."))
+    if bump == "major":
+        core = f"{major + 1}.0.0"
+    elif bump == "minor":
+        core = f"{major}.{minor + 1}.0"
+    else:
+        core = f"{major}.{minor}.{patch + 1}"
+    prefix = f"{m['path']}/" if m["path"] else ""
+
+    if inputs["strategy"] == "inflate":
+        # §6.3: the escalation target (MINOR vs MAJOR) is a policy choice the
+        # spec does not pin, so escalated outcomes assert no exact version.
+        if demoted:
+            return {"channel": "clean", "escalate": True, "bump": None, "version": None}
+        return {"channel": "clean", "escalate": False, "bump": bump, "version": f"{prefix}v{core}"}
+    if demoted:
+        suffix = f"-t{LEVEL_RANK[inputs['effective_trust']]}.{inputs['iteration']}"
+        return {"channel": "prerelease", "bump": bump, "version": f"{prefix}v{core}{suffix}"}
+    return {"channel": "clean", "bump": bump, "version": f"{prefix}v{core}"}
 
 
 # ---- Checks ----------------------------------------------------------------
@@ -233,9 +427,109 @@ def check_grammar(vectors: list[dict]) -> None:
         handler(vec, vec["tag"], exp)
 
 
+def check_aggregation(vectors: list[dict]) -> None:
+    partition = [v for v in vectors if v.get("kind") == "scope_partition"]
+    floor = [v for v in vectors if v.get("kind") == "scope_floor"]
+    meta = [v for v in vectors if v.get("kind") == "meta_path"]
+    check("aggregation-partition-nonempty", bool(partition))
+    check("aggregation-floor-nonempty", bool(floor))
+    check("aggregation-meta-path-nonempty", bool(meta))
+
+    for vec in partition:
+        got = _partition(vec["inputs"]["scopes"], vec["inputs"]["commits"])
+        check(
+            f"aggregation-{vec['id']}",
+            got == vec["expected"]["scopes"],
+            f"partition mismatch: computed {got}, vector says {vec['expected']['scopes']}",
+        )
+
+    for vec in floor:
+        got = _floors(vec["inputs"]["scopes"], vec["inputs"]["commits"])
+        check(
+            f"aggregation-{vec['id']}",
+            got == vec["expected"]["own_trust"],
+            f"floor mismatch: computed {got}, vector says {vec['expected']['own_trust']}",
+        )
+
+    for vec in meta:
+        meta_cfg = vec["inputs"]["meta"]
+        required = LEVEL_RANK[meta_cfg["required_level"]]
+        compiled = [_glob_to_re(g) for g in meta_cfg["paths"]]
+        violations = [
+            c["id"]
+            for c in vec["inputs"]["commits"]
+            if LEVEL_RANK[c["level"]] < required
+            and any(rx.match(p) for p in c["paths"] for rx in compiled)
+        ]
+        got = {
+            "outcome": "verification_failed" if violations else "verified",
+            "violations": violations,
+        }
+        check(
+            f"aggregation-{vec['id']}",
+            got == vec["expected"],
+            f"meta-path mismatch: computed {got}, vector says {vec['expected']}",
+        )
+
+
+def check_propagation(vectors: list[dict]) -> None:
+    prop = [v for v in vectors if v.get("kind") == "propagation"]
+    check("propagation-group-nonempty", bool(prop))
+    has_scc = False
+    for vec in prop:
+        own, edges = vec["inputs"]["nodes"], vec["inputs"]["edges"]
+        scc_of = _sccs(list(own), _edges_to_adj(edges))
+        has_scc = has_scc or len(set(scc_of.values())) < len(own)
+        got = _effective(own, edges)
+        check(
+            f"propagation-{vec['id']}",
+            got == vec["expected"]["effective"],
+            f"effective mismatch: computed {got}, vector says {vec['expected']['effective']}",
+        )
+        # floor_source is asserted where present: the named component must be the
+        # node itself or a reachable dependency, and its own trust must equal the
+        # node's effective trust (it is the component whose own level set the floor).
+        for node, source in vec["expected"].get("floor_source", {}).items():
+            ok = (
+                source in _reachable(node, edges)
+                and own[source] == got[node]
+                and (source != node or own[node] == got[node])
+            )
+            check(
+                f"propagation-floor-source-{vec['id']}-{node}",
+                ok,
+                f"{source} cannot have floored {node} "
+                f"(own {own.get(source)}, effective {got[node]})",
+            )
+    check("propagation-covers-scc-cycle", has_scc, "no vector exercises an SCC cycle")
+
+
+def check_decision(vectors: list[dict]) -> None:
+    dec = [v for v in vectors if v.get("kind") == "decision"]
+    check("decision-group-nonempty", bool(dec))
+    for vec in dec:
+        try:
+            got = _decide(vec["inputs"])
+        except (KeyError, ValueError) as exc:
+            check(f"decision-{vec['id']}", False, str(exc))
+            continue
+        check(
+            f"decision-{vec['id']}",
+            got == vec["expected"],
+            f"decision mismatch: computed {got}, vector says {vec['expected']}",
+        )
+    demote_cells = {
+        (v["inputs"]["effective_trust"], v["inputs"]["blast"])
+        for v in dec
+        if v["inputs"]["strategy"] == "demote"
+    }
+    missing = [f"{t}/{b}" for t, b in _TABLE if (t, b) not in demote_cells]
+    check("decision-table-exhaustive", not missing, f"uncovered §6.4 cells: {missing}")
+
+
 def main() -> int:
     docs: dict[str, dict] = {}
-    for path in (LEVELS, PRECEDENCE):
+    for path in VECTOR_FILES:
         if not path.exists():
             check(f"file-exists-{path.name}", False, str(path))
             continue
@@ -245,12 +539,15 @@ def main() -> int:
         except json.JSONDecodeError as exc:
             check(f"json-wellformed-{path.name}", False, str(exc))
 
-    if len(docs) == 2:
+    if len(docs) == len(VECTOR_FILES):
         check_structure(docs)
         check_spec_version_matches_spec(docs[LEVELS.name]["spec_version"])
         check_levels(docs[LEVELS.name]["vectors"])
         check_precedence(docs[PRECEDENCE.name]["vectors"])
         check_grammar(docs[PRECEDENCE.name]["vectors"])
+        check_aggregation(docs[AGGREGATION.name]["vectors"])
+        check_propagation(docs[PROPAGATION.name]["vectors"])
+        check_decision(docs[DECISION.name]["vectors"])
 
     print(
         f"\n{'OK' if not failures else 'CONFORMANCE VECTORS INVALID'}: "

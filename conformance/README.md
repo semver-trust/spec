@@ -8,8 +8,11 @@ reference implementation treats them as acceptance tests, and any other implemen
 passing them.
 
 Each vector is derived directly from a normative section of the spec and carries a `spec` back-reference to
-it. The vectors in this directory cover **level assignment** (§3.2, §3.3, §4.1–§4.2) and **version precedence
-and tag grammar** (§7.1, §7.2). Aggregation, propagation, and release-decision vectors are added separately.
+it. The vectors in this directory cover **level assignment** (§3.2, §3.3, §4.1–§4.2), **version precedence
+and tag grammar** (§7.1, §7.2), **aggregation** (§5.1–§5.2 scope partitioning and floors, §5.4 meta-paths,
+with §4.4 derivation re-leveling as it feeds §5.2), **transitive propagation** (§5.3, including SCC
+collapse), and **release decisions** (§6.1–§6.4 with §7.1 encoding). Every step of the spec's Appendix A
+worked example is reproduced as a vector (ids containing `appendix-a`).
 
 ## File inventory
 
@@ -17,6 +20,9 @@ and tag grammar** (§7.1, §7.2). Aggregation, propagation, and release-decision
 |---|---|---|
 | `levels.json` | Per-commit trust level assignment vectors (matrix + classification) | Apache 2.0 |
 | `precedence.json` | SemVer precedence ordering vectors + §7.1 tag-grammar vectors | Apache 2.0 |
+| `aggregation.json` | Scope partitioning, per-scope floor, and meta-path hard-fail vectors | Apache 2.0 |
+| `propagation.json` | Effective-trust propagation vectors over dependency graphs (incl. SCCs) | Apache 2.0 |
+| `decision.json` | §6.4 decision-table vectors: trust × blast × strategy → channel/version | Apache 2.0 |
 | `check-conformance.py` (in `../scripts/`) | Independent validator for these files (self-check, not the harness) | Apache 2.0 |
 | `LICENSE` | Verbatim Apache 2.0 text, vendored so copies carry their license | Apache 2.0 |
 
@@ -55,7 +61,7 @@ Every vector, regardless of file, has these common fields:
 | Field | Type | Meaning |
 |---|---|---|
 | `id` | string | Stable, unique identifier, e.g. `levels/matrix/agent-none`. Never reused or repurposed. |
-| `kind` | string | Selects the consumption rule: `matrix`, `classify`, `precedence`, or `grammar`. |
+| `kind` | string | Selects the consumption rule: `matrix`, `classify`, `precedence`, `grammar`, `scope_partition`, `scope_floor`, `meta_path`, `propagation`, or `decision`. |
 | `description` | string | Human-readable intent; editorial, not asserted. |
 | `spec` | string | Back-reference to the governing spec section, e.g. `§3.2`. Never empty. |
 
@@ -124,6 +130,78 @@ The three grammar outcomes are distinct on purpose:
   `vMAJOR.MINOR.PATCH` tag at all. A malformed trust attempt is rejected loudly rather than silently
   ignored.
 
+### `aggregation.json` — kind: `scope_partition`
+
+Diff-path lists mapped through a policy scope-glob map (§5.1). Globs are gitignore-style and segment-aware:
+`*` matches within a path segment, `**` matches across segments (so `services/auth/**` does not match
+`services/authz/…`). Paths matching no glob fall into the implicit `default` scope.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `inputs.scopes` | object | Policy scope map: glob → scope name (§9 `[scopes]`). |
+| `inputs.commits[]` | array | Commits in range; each has `id` (string) and `paths` (diff-path list). |
+| `expected.scopes` | object | Scope name → ids of the commits touching it, in input order. Untouched scopes are absent. |
+
+### `aggregation.json` — kind: `scope_floor`
+
+Same inputs plus per-commit levels; asserts the §5.2 per-scope floor. A commit MAY carry a `derivation`
+object modeling §4.4 as it feeds aggregation: when `verified` is true, paths matching `outputs` contribute
+`inherited_level` (the derivation inputs' floor, computed upstream and carried here as data); all other
+paths — and every path when `verified` is false — contribute the commit's raw `level`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `inputs.scopes` | object | Policy scope map, as above. |
+| `inputs.commits[]` | array | Each has `id`, `level` (`T0`–`T3`), `paths`, and optionally `derivation`. |
+| `inputs.commits[].derivation` | object | `{ "outputs": [globs], "verified": bool, "inherited_level": "T0"–"T3" }`. |
+| `expected.own_trust` | object | Scope name → floored own trust (`T0`–`T3`) for every touched scope. |
+
+### `aggregation.json` — kind: `meta_path`
+
+The §5.4 hard-fail rule: a range containing a meta-path commit below the required level MUST fail
+verification outright — not demote, fail.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `inputs.meta` | object | `{ "paths": [globs], "required_level": "T0"–"T3" }` (§9 `[meta]`). |
+| `inputs.commits[]` | array | Each has `id`, `level`, `paths`. |
+| `expected.outcome` | string | `verified` or `verification_failed`. |
+| `expected.violations` | array | Ids of under-leveled commits touching a meta-path (empty when `verified`). |
+
+### `propagation.json` — kind: `propagation`
+
+Effective trust over the internal dependency graph (§5.3): `effective(C) = min(own(C), min over deps D of
+effective(D))`, with cycles collapsed to their strongly connected component.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `inputs.nodes` | object | Component name → own trust (`T0`–`T3`). |
+| `inputs.edges` | array | Directed edges `[consumer, dependency]`. |
+| `expected.effective` | object | Component name → effective trust, for every node. |
+| `expected.floor_source` | object | Optional. Component name → the component whose own trust set the floor (the node itself when its own trust attains the minimum). |
+
+### `decision.json` — kind: `decision`
+
+The §6.4 default decision table (the illustrative policy; tuned tables are out of scope) with §6.1 semantic
+floor, §6.3 strategies, and §7.1 encoding. `differ proof required` cells resolve to pre-release when
+`differ_available` is false (§1.1 honest degradation); the requirement is qualified to PATCH claims where
+the table says so, and unqualified on the T1/low cell.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `inputs.effective_trust` | string | `T0`–`T3`. |
+| `inputs.blast` | string | Qualitative blast score: `low`, `moderate`, `high` (§6.2). |
+| `inputs.strategy` | string | `demote` or `inflate` (§6.3). |
+| `inputs.differ_available` | bool | Whether a compatibility differ exists for the ecosystem (§6.1). |
+| `inputs.semantic_floor` | string | The §6.1 minimum bump: `patch`, `minor`, `major`. |
+| `inputs.claimed_bump` | string | The claimed bump, same values. |
+| `inputs.current_version` | string | The previous release tag (clean §7.1 form, component path allowed). |
+| `inputs.iteration` | int | Trust-suffix iteration for this cut (≥ 1; re-cuts increment it, §7.2). |
+| `expected.channel` | string | `clean` or `prerelease`. |
+| `expected.bump` | string or null | Final bump: max of claim and semantic floor (the floor is honored unconditionally). |
+| `expected.version` | string or null | The exact §7.1 tag. |
+| `expected.escalate` | bool | Present on `inflate` vectors only: whether the bump escalates. Escalated vectors carry `null` bump/version, because the escalation target (MINOR vs MAJOR) is a policy choice the spec does not pin (§6.3). |
+
 ## How a harness consumes each group
 
 - **`matrix`** — feed `inputs.authorship` and `inputs.review` to the level-assignment function; assert the
@@ -136,6 +214,17 @@ The three grammar outcomes are distinct on purpose:
   than the next; equal precedence is a failure.
 - **`grammar`** — parse `tag`; assert `expected.outcome`, and for `trust_version` / `plain_version` assert
   the extracted `component_path`, `core`, `level`, `iteration`, and `prerelease` match.
+- **`scope_partition`** — partition `inputs.commits` by diff paths through `inputs.scopes`; assert the
+  scope → commits map equals `expected.scopes`.
+- **`scope_floor`** — compute the per-scope own-trust floor (applying any `derivation` re-leveling first);
+  assert it equals `expected.own_trust`.
+- **`meta_path`** — evaluate the §5.4 rule over `inputs.commits` against `inputs.meta`; assert
+  `expected.outcome` and `expected.violations`. `verification_failed` means the whole range fails — an
+  implementation MUST NOT translate it into a demotion.
+- **`propagation`** — compute effective trust over the graph with SCC collapse; assert
+  `expected.effective` for every node, and `expected.floor_source` where present.
+- **`decision`** — run the decision with the §6.4 default table; assert channel, bump, and the exact
+  version string (or, for escalated `inflate` vectors, that the bump escalates).
 
 ## Versioning and stability
 
