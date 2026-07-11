@@ -29,6 +29,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-021 | [Implementations consume conformance artifacts as vendored digest-pinned copies](0021-implementations-consume-conformance-artifacts-as-vendored-digest-pinned-copies.md) | Accepted (2026-07-06) |
 | ADR-022 | [Attestation signatures are SSHSIG over the DSSE PAE with purpose-binding namespaces](0022-attestation-signatures-are-sshsig-over-the-dsse-pae-with-purpose-binding-namespaces.md) | Accepted (2026-07-11) |
 | ADR-023 | [Merge commits are created locally, signed and trailered, never by web-flow](0023-merge-commits-are-created-locally-signed-and-trailered-never-by-web-flow.md) | Accepted (2026-07-11) |
+| ADR-024 | [Adoption boundary: pre-scheme history is exempt, disclosed, and policy-pinned](0024-adoption-boundary-pre-scheme-history-is-exempt-disclosed-and-policy-pinned.md) | Accepted (2026-07-11) |
 
 ## Adding an ADR
 
