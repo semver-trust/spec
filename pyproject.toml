@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Tooling configuration for this repository's scripts.
 #
-# Deliberately dependency-free: scripts/ must run on bare Python
-# (>= 3.11, for tomllib) so CI needs no install step and contributors
-# need nothing beyond `devbox shell`. Adding a [project.dependencies]
-# entry here is a decision, not a convenience — see docs/adr/.
+# Deliberately dependency-light: scripts/ should run on bare Python
+# (>= 3.11, for tomllib). One recorded exception: check-conformance.py
+# imports jsonschema (dev group, pinned by uv.lock) because schema
+# validation at the attestation-fixture freeze gate must be a real
+# Draft 2020-12 validator, not a hand-rolled subset (PR #16 review,
+# 2026-07-11). Adding a [project.dependencies] entry is still a
+# decision, not a convenience — see docs/adr/.
 
 [project]
 name = "semver-trust-spec-scripts"
@@ -15,6 +18,7 @@ license = "Apache-2.0"
 
 [dependency-groups]
 dev = [
+    "jsonschema>=4.21",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "ruff>=0.9",
