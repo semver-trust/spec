@@ -32,10 +32,8 @@ jobs:
         run: |
           task lint
 
-      - name: Check for drift
-        run: |
-          python3 scripts/check-drift.py
-
-      - name: Check conformance vectors
+      # Run the repository's documented verification command itself, so CI
+      # cannot silently drift from what contributors run locally.
+      - name: Verify (drift + conformance)
         run: |-
-          python3 scripts/check-conformance.py
+          task verify

@@ -10,7 +10,7 @@ tasks:
     desc: Run all repository drift/consistency checks
     cmds:
       - python3 scripts/check-drift.py
-      - uv run --group dev --no-install-project python3 scripts/check-conformance.py
+      - uv run --group dev python3 scripts/check-conformance.py
 
   # Executes all linters to ensure code quality and consistency
   # Expected results: All source files conform to style guidelines

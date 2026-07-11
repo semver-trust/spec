@@ -628,8 +628,29 @@ def _schema_validates(payload: bytes) -> bool:
     if schema_file is None:
         return False
     schema = json.loads((ROOT / "schemas" / schema_file).read_text(encoding="utf-8"))
-    validator = jsonschema.Draft202012Validator(schema)
+    # FORMAT_CHECKER enforces the schemas' format: "date-time" (RFC 3339 via
+    # the pinned rfc3339-validator). jsonschema silently skips formats whose
+    # checker package is absent, so check_format_gate proves the checker is
+    # armed on every run.
+    validator = jsonschema.Draft202012Validator(
+        schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER
+    )
     return not list(validator.iter_errors(stmt))
+
+
+def check_format_gate() -> None:
+    """Standing mutation assertion: a payload whose timestamp is not RFC 3339
+    must fail schema validation. Guards both against regression of the format
+    gate and against jsonschema's silent skip-when-unarmed behavior."""
+    payload = json.loads(
+        (ATTESTATIONS_DIR / "payloads" / "release-valid.json").read_text(encoding="utf-8")
+    )
+    payload["predicate"]["timestamp"] = "not-a-date"
+    check(
+        "attest-format-checker-armed",
+        not _schema_validates(json.dumps(payload).encode()),
+        "a non-RFC-3339 timestamp validated: the date-time format checker is not armed",
+    )
 
 
 def _sshsig_verify(env: dict, payload: bytes, registry: Path, signer: str) -> bool:
@@ -848,6 +869,7 @@ def main() -> int:
         check_propagation(docs[PROPAGATION.name]["vectors"])
         check_decision(docs[DECISION.name]["vectors"])
         check_attestations(docs[ATTESTATION.name])
+        check_format_gate()
         check_attestation_regeneration()
         check_release_payload_coherence()
 
