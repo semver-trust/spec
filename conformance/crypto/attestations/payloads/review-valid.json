@@ -1,0 +1,17 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    { "name": "e076050f6714ea6be852fce9c47ff65b05c911b3", "digest": { "gitCommit": "e076050f6714ea6be852fce9c47ff65b05c911b3" } },
+    { "name": "80e2be6297494cd2e3c85d2ace1c7579edac3f74", "digest": { "gitCommit": "80e2be6297494cd2e3c85d2ace1c7579edac3f74" } },
+    { "name": "9672f0b2f901fe632412c8f21026a7467fba585b", "digest": { "gitCommit": "9672f0b2f901fe632412c8f21026a7467fba585b" } }
+  ],
+  "predicateType": "https://semver-trust.dev/review/v0.1",
+  "predicate": {
+    "reviewers": [
+      { "identity": "bob@semver-trust.test", "class": "human", "verdict": "approved" }
+    ],
+    "pull_request": { "url": "https://forge.semver-trust.test/platform/pull/1", "number": 1, "repository": "platform" },
+    "merge_strategy": "merge",
+    "timestamp": "2026-01-01T00:00:00Z"
+  }
+}

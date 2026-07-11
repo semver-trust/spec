@@ -1,0 +1,52 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    { "name": "v0.1.0-t0.1", "digest": { "gitCommit": "9672f0b2f901fe632412c8f21026a7467fba585b" } }
+  ],
+  "predicateType": "https://semver-trust.dev/release/v0.1",
+  "predicate": {
+    "component": "default",
+    "range": { "from": null, "to": "9672f0b2f901fe632412c8f21026a7467fba585b" },
+    "trust": {
+      "effective": "T0",
+      "own": "T0",
+      "floor_source": null,
+      "dependencies_pinned": []
+    },
+    "commits": [
+      {
+        "sha": "e076050f6714ea6be852fce9c47ff65b05c911b3",
+        "level": "T2",
+        "authorship": { "class": "human", "identity": "alice@semver-trust.test", "trailers": { "Provenance": "human" } },
+        "review": { "class": "none" },
+        "derivations": []
+      },
+      {
+        "sha": "80e2be6297494cd2e3c85d2ace1c7579edac3f74",
+        "level": "T0",
+        "authorship": { "class": "agent", "identity": "ci-bot@semver-trust.test", "trailers": { "Provenance": "agent", "Provenance-Agent": "fixture-agent/1.0" } },
+        "review": { "class": "none" },
+        "derivations": []
+      },
+      {
+        "sha": "9672f0b2f901fe632412c8f21026a7467fba585b",
+        "level": "T2",
+        "authorship": { "class": "human", "identity": "bob@semver-trust.test", "trailers": { "Provenance": "human" } },
+        "review": { "class": "none" },
+        "derivations": []
+      }
+    ],
+    "evidence": {
+      "blast_radius": { "loc": 3, "files": 3, "score": "low", "inputs": {} }
+    },
+    "decision": {
+      "claimed_bump": "patch",
+      "semantic_floor": "patch",
+      "strategy": "demote",
+      "channel": "prerelease",
+      "policy": { "path": ".semver-trust/policy.toml", "digest": "sha256:0f9c4e6ab5c3b9d7e1a2f4860d3c5b7a9e1f2d4c6b8a0e2f4d6c8b0a2e4f6d8c" },
+      "supersedes": null
+    },
+    "timestamp": "2026-01-01T00:00:00Z"
+  }
+}
