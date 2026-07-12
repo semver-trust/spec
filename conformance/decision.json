@@ -1,7 +1,7 @@
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.3",
-  "description": "Release-decision vectors for SemVer-Trust (spec/semver-trust.md §6.1-§6.4, §7.1, Appendix A), encoding the §6.4 default decision table (the illustrative policy; tuned tables are out of scope). Inputs: effective trust, qualitative blast score, strategy, differ availability, the §6.1 semantic floor, the claimed bump, the previous release tag, and the trust-suffix iteration for this cut. Expected: the channel, the final bump (max of claim and semantic floor — the floor is honored unconditionally), and the exact §7.1 tag. 'Differ proof required' cells resolve to pre-release when no differ is available (§1.1 honest degradation); the requirement is qualified to PATCH claims where the table says so, and unqualified on the T1/low cell. Under 'inflate', vectors assert whether the bump escalates ('escalate'); the escalation target (MINOR vs MAJOR) is a policy choice per §6.3, so escalated vectors carry null bump/version.",
+  "spec_version": "0.4",
+  "description": "Release-decision kernel vectors for SemVer-Trust (spec/semver-trust.md §6.1-§6.4, §7.1, Appendix A), encoding the §6.4 default decision table (the illustrative policy; tuned tables are out of scope). Version base and trust-suffix iteration inputs are authenticated/derived §7.5 intermediates, never caller authority; version-ancestry.json tests their selection. Expected: the channel, the final bump (max of claim and semantic floor — the floor is honored unconditionally), and the exact §7.1 tag. 'Differ proof required' cells resolve to pre-release when no differ is available (§1.1 honest degradation); the requirement is qualified to PATCH claims where the table says so, and unqualified on the T1/low cell. Under 'inflate', vectors assert whether the bump escalates ('escalate'); the escalation target (MINOR vs MAJOR) is a policy choice per §6.3, so escalated vectors carry null bump/version.",
   "vectors": [
     {
       "id": "decision/table/t3-low",
@@ -15,8 +15,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "patch", "version": "v1.2.4" }
     },
@@ -32,8 +32,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "patch", "version": "v1.2.4" }
     },
@@ -49,8 +49,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "patch", "version": "v1.2.4" }
     },
@@ -66,8 +66,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "patch", "version": "v1.2.4" }
     },
@@ -83,8 +83,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "patch", "version": "v1.2.4" }
     },
@@ -100,8 +100,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t2.1" }
     },
@@ -117,8 +117,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "patch", "version": "v1.2.4" }
     },
@@ -134,8 +134,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t1.1" }
     },
@@ -151,8 +151,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t1.1" }
     },
@@ -168,8 +168,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t0.1" }
     },
@@ -185,8 +185,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t0.1" }
     },
@@ -202,8 +202,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t0.1" }
     },
@@ -219,8 +219,8 @@
         "differ_available": false,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t3.1" }
     },
@@ -236,8 +236,8 @@
         "differ_available": false,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t2.1" }
     },
@@ -253,8 +253,8 @@
         "differ_available": false,
         "semantic_floor": "minor",
         "claimed_bump": "minor",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "minor", "version": "v1.3.0-t1.1" }
     },
@@ -270,8 +270,8 @@
         "differ_available": false,
         "semantic_floor": "minor",
         "claimed_bump": "minor",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "minor", "version": "v1.3.0" }
     },
@@ -287,8 +287,8 @@
         "differ_available": false,
         "semantic_floor": "minor",
         "claimed_bump": "minor",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "minor", "version": "v1.3.0" }
     },
@@ -304,8 +304,8 @@
         "differ_available": true,
         "semantic_floor": "major",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "major", "version": "v2.0.0" }
     },
@@ -321,8 +321,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "minor",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "minor", "version": "v1.3.0" }
     },
@@ -338,15 +338,15 @@
         "differ_available": true,
         "semantic_floor": "major",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "major", "version": "v2.0.0-t0.1" }
     },
     {
       "id": "decision/iteration/re-cut",
       "kind": "decision",
-      "description": "A re-cut at the same core version and level increments the iteration (§7.2): the second T1 cut of the same patch release is -t1.2.",
+      "description": "The decision kernel renders the authenticated second T1 iteration derived by §7.5 as -t1.2; callers do not select the value.",
       "spec": "§7.2",
       "inputs": {
         "effective_trust": "T1",
@@ -355,8 +355,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 2
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 2
       },
       "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t1.2" }
     },
@@ -372,8 +372,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "escalate": true, "bump": null, "version": null }
     },
@@ -389,8 +389,8 @@
         "differ_available": true,
         "semantic_floor": "patch",
         "claimed_bump": "patch",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "escalate": true, "bump": null, "version": null }
     },
@@ -406,8 +406,8 @@
         "differ_available": true,
         "semantic_floor": "minor",
         "claimed_bump": "minor",
-        "current_version": "v1.2.3",
-        "iteration": 1
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "escalate": false, "bump": "minor", "version": "v1.3.0" }
     },
@@ -423,8 +423,8 @@
         "differ_available": true,
         "semantic_floor": "minor",
         "claimed_bump": "minor",
-        "current_version": "common/v0.8.4",
-        "iteration": 1
+        "authenticated_version_base": "common/v0.8.4",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "minor", "version": "common/v0.9.0-t0.1" }
     },
@@ -440,8 +440,8 @@
         "differ_available": true,
         "semantic_floor": "minor",
         "claimed_bump": "minor",
-        "current_version": "auth/v1.3.2",
-        "iteration": 1
+        "authenticated_version_base": "auth/v1.3.2",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "prerelease", "bump": "minor", "version": "auth/v1.4.0-t0.1" }
     },
@@ -457,8 +457,8 @@
         "differ_available": true,
         "semantic_floor": "minor",
         "claimed_bump": "minor",
-        "current_version": "common/v0.8.4",
-        "iteration": 1
+        "authenticated_version_base": "common/v0.8.4",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "minor", "version": "common/v0.9.0" }
     },
@@ -474,8 +474,8 @@
         "differ_available": true,
         "semantic_floor": "minor",
         "claimed_bump": "minor",
-        "current_version": "auth/v1.3.2",
-        "iteration": 1
+        "authenticated_version_base": "auth/v1.3.2",
+        "authenticated_iteration": 1
       },
       "expected": { "channel": "clean", "bump": "minor", "version": "auth/v1.4.0" }
     }

@@ -12,7 +12,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-004 | [Derivation proofs are the only exception to weakest-link flooring](0004-derivation-proofs-are-the-only-exception-to-weakest-link-flooring.md) | Accepted (draft v0.1) |
 | ADR-005 | [Bump policy: semantic floor + evidence ceiling, two strategies](0005-bump-policy-semantic-floor-evidence-ceiling-two-strategies.md) | Accepted (draft v0.1) |
 | ADR-006 | [Path-scoped trust with transitive propagation is first-class](0006-path-scoped-trust-with-transitive-propagation-is-first-class.md) | Accepted (draft v0.1) |
-| ADR-007 | [Configuration is the root of trust; meta-path violations hard-fail](0007-configuration-is-the-root-of-trust-meta-path-violations-hard-fail.md) | Accepted (draft v0.1) |
+| ADR-007 | [Configuration is the root of trust; meta-path violations hard-fail](0007-configuration-is-the-root-of-trust-meta-path-violations-hard-fail.md) | Superseded by ADR-028 (2026-07-12) |
 | ADR-008 | [Unverifiable ≠ T0: verification failures abort](0008-unverifiable-t0-verification-failures-abort.md) | Accepted (draft v0.1) |
 | ADR-009 | [Promotion: same SHA, new attestation; cascades; supersession over mutation](0009-promotion-same-sha-new-attestation-cascades-supersession-over-mutation.md) | Accepted (draft v0.1) |
 | ADR-010 | [Trust channel generalizes (and should not mix with) rc](0010-trust-channel-generalizes-and-should-not-mix-with-rc.md) | Accepted (draft v0.1) |
@@ -31,7 +31,10 @@ are referenced from the specification's design record and elsewhere.
 | ADR-023 | [Merge commits are created locally, signed and trailered, never by web-flow](0023-merge-commits-are-created-locally-signed-and-trailered-never-by-web-flow.md) | Accepted (2026-07-11) |
 | ADR-024 | [Adoption boundary: pre-scheme history is exempt, disclosed, and policy-pinned](0024-adoption-boundary-pre-scheme-history-is-exempt-disclosed-and-policy-pinned.md) | Superseded by ADR-026 (2026-07-12) |
 | ADR-025 | [Self-review exclusion prevents double-counting, not first-counting](0025-self-review-exclusion-prevents-double-counting-not-first-counting.md) | Accepted (2026-07-12) |
-| ADR-026 | [Adoption boundary reaffirmed: the motivating lost key was the GitHub web-flow signer](0026-adoption-boundary-reaffirmed-the-motivating-lost-key-was-the-github-web-flow-signer.md) | Accepted (2026-07-12) |
+| ADR-026 | [Adoption boundary reaffirmed: the motivating lost key was the GitHub web-flow signer](0026-adoption-boundary-reaffirmed-the-motivating-lost-key-was-the-github-web-flow-signer.md) | Superseded by ADR-027 (2026-07-12) |
+| ADR-027 | [Release intervals are explicit and every recurring release chains to the accepted predecessor](0027-release-intervals-are-explicit-and-every-recurring-release-chains-to-the-accepted-predecessor.md) | Accepted (2026-07-12) |
+| ADR-028 | [Bootstrap trust anchors and the previously accepted policy govern policy transitions](0028-bootstrap-trust-anchors-and-the-previously-accepted-policy-govern-policy-transitions.md) | Accepted (2026-07-12) |
+| ADR-029 | [Version ancestry is authenticated independently from release intervals](0029-version-ancestry-is-authenticated-independently-from-release-intervals.md) | Accepted (2026-07-12) |
 
 ## Adding an ADR
 

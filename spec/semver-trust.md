@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # SemVer-Trust: Provenance-Scoped Trust Levels for Semantic Versioning
 
-**Draft v0.3**
+**Draft v0.4**
 **Status:** Design draft for review
-**Date:** 2026-07-03
+**Date:** 2026-07-12
 **Canonical home:** https://semver-trust.dev · https://github.com/semver-trust/spec
 
 ---
@@ -35,16 +35,26 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted 
 
 | Term | Definition |
 |---|---|
+| **Accepted release attestation** | A release attestation whose signature, subject, predicate, predecessor chain, and policy/trust bindings verify under the verifier's trust context. |
 | **Accountable human** | A natural person whose verified identity (via signature or platform-authenticated review) is bound to a change in the role of author or reviewer. |
+| **Active policy** | The policy selected by the bootstrap descriptor or accepted predecessor attestation that governs the current release interval (§5.4). |
 | **Agent** | An automated system (LLM-based or otherwise) that authors or reviews code under a machine identity or under a human's identity. |
 | **Attestation** | A signed [in-toto Statement](https://in-toto.io) binding a subject (commit SHA, tag, artifact digest) to a predicate (facts about provenance, review, evidence, or a release decision). |
+| **Bootstrap descriptor** | Out-of-band chain-genesis trust input binding the initial policy, trust material, release-interval state, and version-ancestry state (§5.4, §7.5). |
+| **Candidate policy** | The policy present at `TO`; on a recurring release it activates only after the active policy has accepted the release (§5.4). |
 | **Component** | A releasable unit within a repository, identified by a scope and released under a (possibly path-prefixed) tag. |
 | **Derivation** | A deterministic transformation from declared input paths to declared output paths via a pinned command. |
 | **Effective trust** | A component's trust level after transitive propagation through its internal dependency graph (§5.3). |
 | **Evidence provider** | A pluggable, ecosystem-specific analyzer supplying compatibility proofs, coverage, or blast-radius inputs (§6). |
 | **Own trust** | The trust floor over commits touching a component's scope, before propagation. |
+| **Predecessor attestation** | The verifier-selected accepted chain head for the same repository and component; its `TO` anchors the next recurring interval (§5.2). |
+| **Release interval** | The exact set of commits whose provenance contributes to a release, selected by inception, adoption, or recurring mode (§5.2). |
 | **Scope** | A named set of repository paths defined in the policy file (§9). |
+| **Target lineage** | The accepted source intervals whose changes must support the current target's trust claim; it accumulates through re-cuts and advances from unpromoted targets, and resets only after an accepted clean target or at authenticated bootstrap (§7.5). |
 | **Trust channel** | The release lane implied by trust: the *clean channel* (plain version) or the *pre-release channel* (version carrying a trust identifier). |
+| **Version action** | Signed release intent selecting advance, re-cut, or supersede behavior under authenticated version state (§7.5). |
+| **Version predecessor** | The bootstrap-pinned legacy clean tag, or accepted predecessor decision, that supplies authenticated version state; distinct from a release-interval boundary (§7.5). |
+| **Version state** | Per-component authenticated state from which the target core, trust-suffix iteration, and exact emitted tag are derived (§7.5). |
 
 ## 3. Trust model
 
@@ -158,20 +168,71 @@ Derivation proofs are the scheme's only exception to weakest-link flooring, and 
 
 The policy file (§9) maps path globs to named scopes. A commit **touches** a scope if any path in its diff matches the scope's globs. Scoping keys off diff paths — objective ground truth from git — never off declared intent, commit messages, or size heuristics. A commit touching `services/auth/**` and `docs/**` contributes its trust level to both scopes. Paths matching no scope fall into an implicit `default` scope.
 
+For a root commit included by an inception interval, diff paths are computed
+against Git's empty tree. Merge-commit conflict-resolution changes follow
+§4.3.4; adoption does not retroactively assign trust to exempt parent history.
+
 There is no *de minimis* exception: a one-line T0 commit floors its scope exactly like a thousand-line one. Any "trivial commits don't count" rule becomes the hiding place for a payload; the only sanctioned exception is a verified derivation proof (§4.4).
 
 ### 5.2 Own trust (per-scope floor)
 
-For a component release covering commit range `FROM..TO` (git two-dot: commits reachable from `TO` and not from `FROM`; for a first release, `FROM` is the root):
+Let `Reach(X)` be the set containing commit `X` and every commit reachable
+through its parents. A release resolves every supplied ref once to an immutable
+commit object ID and selects exactly one **release interval**:
+
+1. **Inception interval:** a chain-genesis release with no adoption boundary covers
+   `Reach(TO)`. The equivalent Git operation is `git rev-list TO`; every
+   reachable root is included.
+2. **Adoption interval:** a chain-genesis release with bootstrap-pinned boundary `B`
+   covers `Reach(TO) − union(Reach(p) for p in parents(B))`. The equivalent Git
+   operation is `git rev-list TO --not B^@`. `B` MUST be reachable from `TO` and
+   is included; only history reachable through its parents is exempt.
+3. **Recurring interval:** every later source release covers
+   `Reach(TO) − Reach(P)`, equivalent to `git rev-list P..TO`, where `P` is the
+   resolved `TO` from the accepted predecessor attestation. `P` MUST be an
+   ancestor of `TO` and MUST be the verifier-selected current chain head for the
+   same repository and component. A caller-supplied alternate `FROM`, a missing
+   or ambiguous head, a moved predecessor tag, a skipped chain link, or a
+   non-ancestor MUST abort verification.
+
+The commit set is normative; implementations MAY process it in any order that
+records every member exactly once. Newly merged unrelated history is included
+when it becomes reachable from `TO` and was not reachable from the predecessor.
+When `TO = P`, the operation is a promotion or other superseding re-evaluation
+of the existing source release (§7.3), not a new empty source interval. A
+superseding re-evaluation preserves the source release's exact interval,
+source-predecessor link, active authority, candidate state, and version target
+lineage. It cannot use newly activated candidate keys to re-evaluate the
+transition that enrolled them, and it does not rewrite source-predecessor links
+after a later source release has advanced the chain.
+
+Release-interval selection does not select a version predecessor. `B`, `P`, and
+a legacy version tag may name the same commit, but equality does not merge their
+roles: interval state answers which commits contribute trust, source continuity
+answers which attestation precedes this release, and version state answers which
+SemVer line and iteration are continued (§7.5, ADR-029).
+
+For every scope touched by the selected interval:
 
 ```
 own_trust(scope) = min over commits c in range, c touches scope:
                      level(c)        # per §3.2, after derivation proofs (§4.4)
 ```
 
-A commit that fails signature verification, or whose required attestations cannot be located and verified, has no level: verification of the release MUST fail (§10). Unverifiable is not T0 — T0 is a verified fact about a verified commit.
+A commit that fails signature verification, or whose required attestations
+cannot be located and verified, has no level: verification of the release MUST
+fail (§10). Unverifiable is not T0 — T0 is a verified fact about a verified
+commit.
 
-**Adoption boundary (optional).** A repository whose earliest history predates the scheme — or is otherwise unverifiable (a lost signing key, a platform migration) — MAY declare a single **adoption boundary** in its policy file (§9, `[policy] adoption_boundary`): a commit, named by SHA or tag, before which history is exempt. With a boundary declared, a first release verifies `boundary..TO` in place of `root..TO`; a release anchored at a previously verified tag is unaffected. Three properties bind the boundary. It is **policy-pinned** — the boundary lives only in the policy file, never in a command-line argument or environment, so moving it is itself a meta-path commit that MUST meet the required meta level (§5.4), and the §8.1 pinned policy digest freezes which boundary produced each decision. It is **disclosed** — a release whose range begins at the boundary MUST mark this in its attestation (the additive `range.from_is_adoption_boundary` field, §8.1), because "verified since the boundary" and "verified since inception" are different claims a consumer must be able to tell apart. It is **exempt, never laundered** — commits before the boundary contribute no trust level at all: they lie outside every range and are reported as out-of-scope, never as T0 (unverifiable is not T0). The boundary moves where verification *starts*, visibly; it never weakens what verification *means* within the region it covers. See spec repository ADR-026, superseding ADR-024.
+**Adoption boundary (optional).** A repository whose earliest history predates
+the scheme — or is otherwise unverifiable — MAY establish one boundary in its
+out-of-band bootstrap descriptor (§5.4). The resolved boundary object ID is
+immutable chain-genesis state. It is **included** in the verified interval,
+**disclosed** in the release attestation, and **exempt, never laundered** only
+for its parent history: pre-boundary commits contribute no trust level and are
+reported as outside the verified region, never as T0. A legacy
+`[policy] adoption_boundary` value MAY mirror the bootstrap value but MUST match
+it and has no authority to move it. See ADR-027, superseding ADR-026.
 
 ### 5.3 Transitive propagation (effective trust)
 
@@ -188,13 +249,73 @@ effective(C) = min( own_trust(C),
 - Propagation is what makes path scoping safe rather than cosmetic. Without it, risk launders into shared libraries while consumers' scopes stay pristine — the same failure mode dependency scanners had before transitive analysis. It also concentrates the incentive correctly: shared packages are where human review buys the most trust, because their level multiplies across every consumer.
 - External (third-party) dependencies are out of scope for effective-trust computation (§1.2); policy MAY impose separate requirements on them.
 
-### 5.4 Meta-paths: the configuration is the root of trust
+### 5.4 Meta-paths and policy transitions
 
-The policy file, scope map, derivation rules, identity map, and the workflows that generate attestations can reclassify anything. Therefore:
+The policy file, scope map, derivation rules, identity map, trust material, and
+workflows that generate attestations can reclassify anything. A candidate policy
+at `TO` therefore MUST NOT authorize its own transition.
 
-- These paths MUST be declared as **meta-paths** in policy.
-- Commits touching meta-paths MUST meet the maximum trust level required anywhere in the policy (typically T3), regardless of which scope they otherwise fall in, and SHOULD additionally require review by designated owners (CODEOWNERS or equivalent).
-- A release range containing a meta-path commit below the required level MUST fail verification outright — not demote, fail. The config protects the system; the system must protect the config.
+The verifier selects the **active policy** and role-separated trust material
+from one of two authorities:
+
+- **Chain genesis:** an out-of-band bootstrap descriptor binds the repository
+  and component; interval mode and boundary when applicable; canonical tag
+  prefix and version predecessor or explicit version genesis (§7.5); policy
+  path and digest; non-removable meta paths for attestation-generating
+  workflows; trust-material digests; verification profile; and injected-clock
+  semantics. The verifier MUST authenticate the descriptor from local
+  configuration or a signature under a verifier-pinned bootstrap authority;
+  repository-controlled bytes alone do not establish it. The policy at `TO`
+  and all supplied trust bytes MUST match these pins exactly.
+- **Recurring release:** the accepted predecessor attestation binds the active
+  policy path/digest, mandatory workflow meta paths, trust-material digests,
+  verification profile, and authenticated version state (§7.5). This active
+  state governs every commit in the new interval. The final policy at `TO` is
+  the **candidate policy** and activates only after the release succeeds;
+  intermediate policy versions do not activate mid-interval.
+
+The bootstrap descriptor also pins the chain's clock profile, which every
+accepted attestation carries forward. The profile defines the instant's source
+and its validity/freshness semantics. Each verification MUST receive an
+explicit verifier-supplied instant under that profile and MUST record the
+instant in its release attestation. A candidate-supplied timestamp is evidence,
+not clock authority; implicit wall-clock reads and ambient trust roots are not
+verification authority.
+
+Release continuity, policy activation, and version state are component-chain
+state. In a monorepo, accepting a candidate policy or version transition for
+component `A` does not activate it for component `B`; `B` continues under its
+own accepted predecessor until its chain crosses the transition. Shared-key
+rotations therefore retain the old roots until every relevant component chain
+has transitioned.
+
+The active policy's identity registries and required meta level apply to every
+commit touching either policy path, either policy's declared meta paths, the
+authority's mandatory workflow paths, or repository-local trust material
+referenced by either policy. Candidate-only keys cannot authorize their own
+enrollment. A candidate policy MUST retain the chain policy path, cover its own
+path, the authority's mandatory workflow paths, and repository-local trust
+material in its meta paths, set a meta required level no lower than the active
+level, and match the immutable adoption boundary when a legacy mirror is
+present.
+
+Therefore:
+
+- The policy path and every repository-local trust-material path are implicit
+  meta-paths even if a glob omits them. The candidate must also cover every
+  workflow path pinned by chain authority; any omission makes it invalid.
+- Commits touching the union of active and candidate meta-paths MUST meet the
+  active required level, regardless of which scope they otherwise fall in, and
+  SHOULD additionally require review by designated owners.
+- An unknown active signer, mismatched trust digest, uncovered mandatory path,
+  lowered meta level, moved boundary, or under-level meta-path commit MUST fail
+  verification outright — not demote, fail.
+- A valid key rotation is two-stage: old roots authorize the transition; new
+  roots become usable only after an accepted release activates the candidate.
+
+Repository paths supplied explicitly to a verifier are byte locators only; they
+MUST match the bootstrap/predecessor digests and never override them. See
+ADR-028, superseding ADR-007.
 
 ## 6. Release evaluation
 
@@ -202,6 +323,15 @@ A release decision consumes two independent inputs and applies policy:
 
 - **Semantic floor** — the *minimum* bump the change semantics permit.
 - **Evidence ceiling** — the *maximum* claim the provenance evidence supports.
+
+The resulting effective bump and channel are applied to verifier-selected
+version state (§7.5). The producer may propose a signed version action and
+claimed bump, but it does not supply the prior version, tag prefix, or
+trust-suffix iteration. A pending corrective bump in authenticated version state
+is an additional floor applied before the decision channel and tag are derived.
+For re-cuts, supersessions, and advances from unpromoted targets, effective
+trust, blast, and compatibility evidence apply to the complete target lineage
+(§7.5), not only the newest source interval.
 
 ### 6.1 Semantic floor
 
@@ -275,14 +405,23 @@ SemVer compares dot-separated pre-release identifiers left to right, ASCII-lexic
 
 - `v1.4.0-rc.1 < v1.4.0-t1.1 < v1.4.0` (`"rc" < "t1"`). A trust-gated release outranks an rc among pre-releases.
 - This spec's position: **the trust channel generalizes the rc pattern.** An rc's traditional job — publish, soak, gather evidence, promote — is precisely the trust-promotion lane. Projects adopting SemVer-Trust SHOULD NOT combine `rc`-style identifiers and trust identifiers on the same version; a below-threshold release *is* the release candidate, with the trust level stating *why* it is not yet clean.
-- Iteration (`.2`, `.3`) increments for re-cuts at the same core version and level; a re-cut at a *different* level starts a new suffix (`-t0.1` → fixes reviewed → `-t2.1`).
+- Iteration (`.2`, `.3`) is derived from the accepted version-decision lineage
+  (§7.5): a re-cut at the same core version and level increments that level's
+  prior maximum; the first cut at a different level starts at one (`-t0.1` →
+  fixes reviewed → `-t2.1`). A producer never supplies the iteration.
 
 ### 7.3 Promotion
 
 Promotion moves a release from the pre-release channel to the clean channel **without changing its source**:
 
 1. New evidence is attested (human review attestation, soak/canary evidence, audit) against the same commit SHA.
-2. The verifier recomputes effective trust and the decision table; if the release now qualifies, the clean tag (`v1.4.0`) is created **on the identical SHA**, with a fresh release attestation citing the promotion evidence and superseding the prior decision.
+2. The verifier recomputes effective trust across the preserved target lineage
+   and applies the decision table while preserving the authenticated version
+   target (§7.5); if the release now
+   qualifies and source continuity has not advanced, the clean tag (`v1.4.0`)
+   is created **on the identical SHA**, with a fresh release attestation citing
+   the promotion evidence and superseding the prior decision. A later
+   re-evaluation is attestation-only (§7.5).
 3. **Immutable registries:** git and Go modules tolerate two tags on one commit, but npm/PyPI artifacts bake the version string into package metadata, so promotion there means *republication from the identical source SHA*. With reproducible builds the artifact digest matches; without, each artifact carries its own attestation bound to the same source SHA, and the source binding — not the digest match — is the promotion guarantee.
 4. **Cascade:** promotion of a dependency MAY trigger re-evaluation of downstream components whose effective trust was floored by it (their attestations pin the dependency, §5.3, making affected components discoverable). Downstream promotion follows the same rule: same SHA, new attestation. This resolves the "auth is stuck in pre-release because pkg/common was T0" case without rebuilding auth.
 5. Demotion (evidence invalidated, e.g., a review attestation revoked) cannot un-publish a clean version; it is expressed by publishing a superseding attestation and, where warranted, a security advisory. This is the standing reason the attestation, not the tag, is the living record (§1.1, Principle 5).
@@ -300,11 +439,117 @@ The git tag is canonical; registries receive projections:
 
 The PyPI row is the existence proof for Principle 5: any consumer logic that depends on parsing trust out of a version string is non-portable; portable consumers verify attestations.
 
+### 7.5 Authenticated version ancestry
+
+The exact release tag is derived from per-component authenticated **version
+state**, never from a caller-selected `current_version`, `FROM`, or iteration.
+The release interval (§5.2) and version ancestry are independent.
+
+At chain genesis, the authenticated bootstrap descriptor binds a canonical tag
+prefix and exactly one of:
+
+1. `version_predecessor: null`, explicitly starting a new version line. The
+   synthetic clean baseline is `v0.0.0`; it names no Git object and makes no
+   claim that historical tags are absent.
+2. One version-predecessor descriptor containing a canonical clean §7.1 tag,
+   its raw Git ref-target object ID, and its peeled commit object ID. The prefix
+   MUST equal the chain's tag prefix. For inception, the predecessor commit MUST
+   be an ancestor of or equal to `TO`. For adoption, it MUST be an ancestor of
+   or equal to `B`; it may therefore precede the first verified commit without
+   laundering exempt history. Implementations use
+   `git merge-base --is-ancestor V TO` or
+   `git merge-base --is-ancestor V B`, respectively.
+
+The descriptor, not repository tag discovery, selects the genesis predecessor.
+For a non-null selection, a missing or malformed tag, zero or multiple
+descriptors, prefix/component mismatch, changed raw ref target, changed peeled
+commit, or failed ancestry check MUST abort. Null genesis MUST be explicit and
+authenticated; it is never inferred from failed discovery. Tooling MAY propose
+a descriptor for explicit maintainer approval but MUST NOT silently select the
+highest or nearest tag.
+
+A chain-genesis release MUST use the advance action.
+
+Every accepted release decision carries forward the tag prefix; target baseline,
+represented by synthetic genesis or an authenticated canonical tag with
+raw/peeled object IDs and source identity; current target core and bump; whether
+the clean target has been accepted; current accepted decision and immutable tag
+anchoring its decision lineage; accepted source-interval identities accumulated
+for the current trust claim; accepted per-level trust iterations; and an
+explicit pending corrective bump greater than the target bump, or its absence.
+An attestation-only decision retains the prior immutable tag while becoming the
+current accepted decision. The accepted predecessor supplies this state for
+recurrence. Applying the bound target bump to the baseline core MUST produce the
+target core exactly.
+
+The producer MUST NOT supply an aggregate target trust level. The verifier
+derives it from the complete bound target lineage and authenticated evidence.
+
+At adoption genesis, compatibility evidence may span from a legacy version
+predecessor before `B`, but the target trust lineage starts with the verified
+adoption interval. Exempt history remains disclosed and receives no trust level.
+
+A release proposes one signed **version action**:
+
+- **Advance:** apply the effective bump (the greater of claimed bump, semantic
+  floor, and any pending corrective bump) to the predecessor target core, or to
+  `0.0.0` at explicit genesis, establishing a new target. Its target baseline
+  becomes the bootstrap-pinned legacy predecessor or immutable lineage tag and
+  source identity bound by the prior accepted decision, or synthetic genesis on
+  the first release. At bootstrap, or when the predecessor target has an accepted
+  clean tag, the new target lineage contains the current source interval only.
+  When advancing from an unpromoted target, it appends the current interval to
+  the predecessor's target lineage so skipped prereleases cannot launder trust.
+  The resulting target bump is that effective bump. Advance clears the
+  correction. If the result is a trust prerelease, its iteration is one for that
+  level.
+- **Re-cut:** preserve an unpromoted target core while source changes are added.
+  The clean target MUST NOT already have been accepted. Compatibility evidence
+  from the target's bound baseline source through the new `TO` MUST be
+  recomputed; the baseline may itself be a trust prerelease. For synthetic
+  genesis, evidence covers the complete inception history through the new `TO`.
+  The current source interval is appended to the target lineage. Effective trust
+  and blast are recomputed across every contributing interval, with each commit
+  governed by the active authority bound to its original interval; a high-trust
+  fix interval cannot erase an earlier low-trust contribution. If the semantic
+  floor exceeds the target's bound bump, verification aborts and the release
+  must advance to a sufficient target. A trust result's iteration is one greater
+  than the highest accepted iteration for that target and level in the selected
+  version-decision lineage. A pending corrective bump prohibits re-cut.
+- **Supersede:** preserve `TO`, interval, target lineage, baseline, and target
+  core while evidence changes. Promotion emits the unoccupied clean target;
+  another trust decision derives its iteration as above. Demotion of an accepted
+  clean release is attestation-only and does not mutate its tag. Compatibility
+  evidence is recomputed from the bound target baseline; if its effective bump
+  exceeds the bound target bump, the semantic invalidation is also
+  attestation-only because no new tag can repair an immutable under-bumped
+  release. If that decision is still the source head, resulting state binds the
+  effective bump as a pending corrective floor. A later same-head supersession
+  clears it only if recomputed evidence no longer exceeds the target bump. After
+  a later source release has advanced continuity, every supersession of the
+  older decision is attestation-only: it emits no tag, consumes no iteration,
+  and cannot rewrite or become authority for the successor's already-bound
+  version state.
+
+The version action and claimed bump are candidate decision facts and MUST be
+bound by the accepted attestation. They do not authorize alternate prior state.
+Any compatibility input asserting a version predecessor, current version, or
+iteration MUST equal the authenticated/derived value or verification aborts.
+
+Before emission, the verifier derives the exact tag from the bound prefix,
+target core, decision channel, effective trust level, and derived iteration. If
+that tag name already exists, new emission MUST abort; tags are never moved or
+overwritten. The release attestation binds both prior and resulting version
+state. See ADR-029.
+
 ## 8. Attestation
 
 ### 8.1 Release attestation predicate
 
-Release attestations are in-toto Statements (`https://in-toto.io/Statement/v1`). Subjects bind the tag name to the commit SHA (and artifact digests where applicable). Sketch of the predicate (schema to be formalized; field names illustrative):
+Release attestations are in-toto Statements
+(`https://in-toto.io/Statement/v1`). Subjects bind the tag name to the commit
+SHA (and artifact digests where applicable). The following is a historical v0.1
+example; its emitted schema and interpretation remain frozen:
 
 ```json
 {
@@ -349,7 +594,37 @@ Release attestations are in-toto Statements (`https://in-toto.io/Statement/v1`).
 }
 ```
 
-Normative points: the **provenance vector** (per-commit authorship and review classes) MUST be preserved even though the tag carries only the scalar level (§3.2); the policy file digest MUST be pinned so a decision is reproducible against the exact policy that produced it; `range.from_is_adoption_boundary` discloses when a first release's range begins at a policy-declared adoption boundary (§5.2) rather than at the repository root, a distinction consumers MUST be able to make; `supersedes` links promotion/demotion chains.
+Across predicate versions, the **provenance vector** (per-commit authorship and
+review classes) MUST be preserved even though the tag carries only the scalar
+level (§3.2), and `supersedes` links promotion/demotion decisions.
+
+A v0.4 release attestation MUST additionally bind the interval mode and resolved
+`TO`; the resolved adoption boundary for adoption mode; the cryptographic
+identity of the accepted predecessor attestation for recurring mode; the active
+policy and role-separated trust-material digests that evaluated the interval;
+the candidate policy and trust-material digests activated for the next interval;
+the authority-pinned mandatory workflow paths; the verification and clock
+profiles plus injected verification instant; the version action, genesis marker
+or predecessor, prior and resulting version-state identities, exact emitted tag
+or explicit no-emission marker, immutable lineage tag raw/peeled object IDs, and
+derived iteration where applicable; the target lineage's accepted interval
+identities and aggregate evidence; and the bootstrap descriptor or predecessor
+that selected the active state.
+Predicate v0.1 cannot express those continuity claims and MUST NOT be used to
+claim v0.4 release conformance. This draft does not change existing v0.1 bytes
+or fixture expectations and assigns them no v0.4 continuity meaning. Because
+v0.1 did not encode its evaluator/specification profile, the successor
+compatibility work must make its legacy verification profiles explicit. A
+successor predicate URI and schema are required before v0.4 release attestations
+can be emitted; this draft does not assign that URI.
+
+Migration from v0.1 establishes a new authenticated v0.4 chain genesis. The
+bootstrap descriptor MAY independently pin a selected legacy `TO` as an included
+adoption boundary and a canonical clean legacy tag as a version predecessor when
+each satisfies §5.2 and §7.5. Neither binding implies the other: the version
+predecessor may precede a later adoption boundary. A v0.1 attestation may be
+retained as historical evidence but cannot serve as recurring authority because
+it does not bind the active/candidate policy, trust, and version state.
 
 ### 8.2 Storage and verification of attestations
 
@@ -366,7 +641,7 @@ The policy file is TOML, lives in the repository, and is itself a meta-path (§5
 version   = "0.1"
 threshold = "T2"        # minimum effective trust for the clean channel
 strategy  = "demote"    # "demote" (recommended) | "inflate"
-# adoption_boundary = "v0.0.0"   # optional (§5.2, ADR-026): commit/tag before which history is exempt
+# adoption boundary is immutable bootstrap state (§5.2), not mutable policy
 
 [scopes]
 "services/auth/**"    = "auth"
@@ -426,22 +701,92 @@ coverage_min_changed_lines  = 0.70
 dist_tag_prefix = "trust-"
 ```
 
-Three fields above are optional and absent by default. `[policy] adoption_boundary` (§5.2, ADR-026, superseding ADR-024) exempts pre-boundary history. `[identity.human] gpg_keyring` names an armored OpenPGP public keyring for GPG-signed commits — the OpenPGP counterpart to the SSH `allowed_signers` registry. `[identity] attestation_signers` names the registry of keys trusted to sign review and release attestations (SSHSIG over the DSSE PAE, §4.3, §8.2). A verifier MAY default its trust-material paths from these policy fields when the corresponding inputs are not supplied out-of-band; an explicitly supplied path overrides the policy.
+`[identity.human] gpg_keyring` is optional and names an armored OpenPGP public
+keyring for GPG-signed commits — the OpenPGP counterpart to the SSH
+`allowed_signers` registry. `[identity] attestation_signers` is optional and
+names the registry of keys trusted to sign review and release attestations
+(SSHSIG over the DSSE PAE, §4.3, §8.2). These paths locate repository bytes;
+their digests and roles come from the bootstrap descriptor or accepted
+predecessor and MUST match (§5.4). An explicitly supplied path MAY locate the
+same pinned bytes but MUST NOT override their digest or role.
+
+The policy at `TO` is a candidate on recurring releases. The active predecessor
+policy evaluates the complete interval; only an accepted release activates the
+candidate for the next interval. A legacy `[policy] adoption_boundary` MAY be
+parsed for backward compatibility but is not authoritative in v0.4 and MUST
+match the bootstrap descriptor (§5.2).
 
 ## 10. Verification algorithm (normative)
 
-Given a component `C`, a proposed release at commit `TO`, and previous tag `FROM`:
+Given a component `C`, proposed release commit `TO`, and exactly one
+verifier-selected chain authority — a bootstrap descriptor for chain genesis,
+an accepted predecessor attestation for a recurring release, or an accepted
+decision selected for superseding re-evaluation:
 
-1. **Load policy** from `TO`'s tree; record its digest. Verify the policy file's own history within `FROM..TO` satisfies §5.4 (meta-path level); on failure, **abort**.
-2. **Enumerate commits**: `git rev-list FROM..TO` (for a first release, `root..TO` — or `boundary..TO` when the policy declares an adoption boundary, §5.2). History rewrites on the protected branch invalidate prior tags' ranges and MUST be treated as verification failure.
-3. **Per commit**: verify the signature and resolve the signer's identity class (§4.2); read trailers (§4.1); locate and cryptographically verify the covering review attestation (§4.3). Any commit that cannot be verified end-to-end → **abort** (unverifiable ≠ T0, §5.2). Assign the level per §3.2.
-4. **Apply derivation proofs** (§4.4): re-run each rule against `TO`'s tree; on byte-identical outputs, re-level output paths to the inputs' floor.
-5. **Partition by scope** (§5.1) using each commit's diff paths; compute `own_trust` per touched scope (§5.2).
-6. **Propagate**: resolve the internal dependency graph via the graph adapter at the consumed versions; collapse SCCs; compute `effective(C)` (§5.3); record pinned dependencies and the floor source.
-7. **Collect evidence**: run configured evidence providers (compatibility differ, coverage, blast-radius inputs); compute the semantic floor (§6.1) and blast score (§6.2).
-8. **Decide** via the policy table (§6.4) and strategy (§6.3): channel and final version string (§7.1), honoring the semantic floor unconditionally.
-9. **Emit**: create the signed annotated tag; assemble, sign, and store the release attestation (§8); project to registries (§7.4).
-10. **Promotion runs** re-execute steps 6–9 against the same `TO` with the new evidence attached, producing a superseding attestation (§7.3).
+1. **Resolve immutable inputs:** resolve `TO` and every named boundary/tag once.
+   Record raw ref-target object IDs and peeled commit object IDs separately;
+   later ref movement or recreation is a verification failure.
+2. **Select active authority:** validate the bootstrap descriptor or the
+   predecessor's signature and complete chain. For a predecessor, require the
+   same repository and component, the unique accepted chain head, and an
+   ancestor `P`. Load active policy/trust bytes and require every digest and role
+   to match the authority. Require an explicit verifier-supplied verification
+   instant under the authority's pinned clock profile (§5.4). Select the
+   component's tag prefix and version state from the bootstrap descriptor or
+   accepted predecessor, validate §7.5 ancestry/ref bindings, and reject any
+   caller-selected version predecessor, `current_version`, or iteration.
+3. **Enumerate the release interval** using the inception, adoption, or recurring
+   reachability set in §5.2. No caller-selected alternate `FROM` is accepted.
+4. **Load the candidate policy** from `TO`; record its digest and referenced
+   trust-material digests. On bootstrap it MUST equal the pinned active policy.
+   On recurrence, validate its mandatory policy/trust/workflow meta coverage,
+   non-decreasing meta level, policy path, and immutable boundary under the
+   active policy (§5.4).
+5. **Per commit under active authority:** verify the signature and active signer
+   class (§4.2); read trailers (§4.1); locate and verify the covering review
+   attestation under active attestation roots (§4.3). Any unverifiable commit →
+   **abort**. Assign the level per §3.2.
+6. **Enforce meta paths:** apply the active required level to the union of active
+   and candidate meta/policy/trust-material paths. Any violation → **abort**
+   (§5.4).
+7. **Apply derivation proofs** (§4.4) under the active policy.
+8. **Partition by scope** (§5.1) under the active policy and compute
+   `own_trust` (§5.2). Candidate scope changes do not affect the current interval.
+9. **Propagate:** resolve the internal dependency graph at consumed versions,
+   collapse SCCs, compute `effective(C)` (§5.3), and record pinned dependencies
+   and the floor source.
+10. **Collect evidence** under the active policy: run configured providers and
+    compute the semantic floor (§6.1) and blast score (§6.2).
+11. **Decide and derive the tag:** evaluate the active policy table (§6.4) and
+    strategy (§6.3), honoring the semantic floor unconditionally. Apply the
+    signed advance/re-cut/supersede action to authenticated version state and
+    for a re-cut, supersession, or advance from an unpromoted target reconstruct
+    the complete target lineage under each interval's bound authority. Derive
+    target-level trust, blast, semantic floor, exact target core, and iteration
+    (§7.5). Any occupied output tag,
+    incomplete target lineage, incompatible re-cut, or version-state mismatch →
+    **abort**; a superseding semantic invalidation follows §7.5's
+    attestation-only path instead.
+12. **Emit and advance:** construct the signed annotated tag object and obtain
+    its raw/peeled IDs without overwriting a ref; assemble, sign, and store the
+    release attestation (§8), binding the interval, active authority, candidate
+    state, profiles, injected verification instant, and prior/resulting version
+    state; then publish the final tag ref only if absent and project to registries
+    (§7.4). An orphan object or attestation alone is not accepted chain state,
+    and retry MUST NOT move an occupied tag. Only acceptance of this new-source
+    attestation advances source continuity and activates the candidate policy
+    and resulting version state for the next interval.
+13. **Superseding re-evaluations** — including promotion and demotion — first
+    validate the superseded decision and its complete source/predecessor chain.
+    They preserve its exact `TO`, interval, source-predecessor link, active
+    policy/trust/profile state, candidate policy/trust state, and version
+    baseline/target lineage. They re-execute the superseded source interval under
+    its original active authority and each earlier target-lineage interval under
+    the authority bound to that interval, using updated authenticated evidence
+    (§7.3, §7.5). Such a re-evaluation cannot activate a different candidate or
+    create a new source interval. After source continuity has advanced, it is
+    attestation-only and cannot emit a tag, consume an iteration, or rewrite
+    existing successor/version links.
 
 ## 11. Threat model
 
@@ -452,12 +797,17 @@ Given a component `C`, a proposed release at commit `TO`, and previous tag `FROM
 | Review rubber-stamping | Evidence ceiling still applies (differ proofs, coverage); distinct-identity requirement for T3; audit trails in attestations | Moderate — review *quality* is out of scope by design |
 | Payload hidden in "trivial" commit | No de-minimis exception (§5.1); only verified derivations bypass flooring | Low |
 | Risk laundering via shared libs | Transitive propagation over the workspace graph (§5.3) | Low |
-| Scope-map / policy tampering | Meta-paths require max level; violations fail verification outright (§5.4) | Low |
+| Scope-map / policy tampering | Bootstrap/predecessor selects active policy; authority-pinned workflows and union meta-paths require the active level; candidate activates only after acceptance (§5.4) | Low |
+| Candidate key self-enrollment | Candidate-only identities cannot verify their transition; old roots govern the interval (§5.4) | Low |
+| Skipped release history | Recurring intervals anchor to the accepted predecessor chain head; arbitrary `FROM` is rejected (§5.2) | Low once the verifier has an authoritative current head; rollback/freeze remains (§12.9) |
+| Adoption-boundary movement | Boundary is immutable bootstrap chain state and the boundary commit is included (§5.2) | Low |
+| Version-line or iteration injection | Bootstrap/predecessor binds version state; exact tags and iterations are derived; moved, ambiguous, or caller-selected predecessors fail (§7.5) | Low once the verifier has an authoritative current version-decision head (§12.9) |
+| Trust reset across skipped prereleases | Target lineage accumulates through re-cuts and advances from unpromoted targets; only complete authenticated reevaluation can raise it (§7.5) | Low once the complete accepted target lineage is available |
 | Squash/rebase provenance destruction | Forbid, or capture pre-squash provenance in merge attestation (§4.3) | Low |
 | Conflict-resolution smuggling in merge commits | Non-empty merge diffs classified as authored changes (§4.3.4) | Low |
-| Attestation store tampering | Signatures inside attestations are the anchor; transparency logs; storage never trusted (§8.2) | Low |
+| Attestation store tampering | Signatures detect forgery; an authoritative current-state or transparency profile is needed to detect hidden successors/demotions (§8.2) | Moderate until §12.9 is resolved |
 | Generator/toolchain compromise | Toolchain pinned as derivation input; pin changes are ordinary trust-classified commits (§4.4) | Moderate — inherits general supply-chain exposure |
-| History rewrite on protected branch | Branch protection; rewrite ⇒ verification failure (§10.2) | Low |
+| History rewrite on protected branch | Immutable predecessor/`TO` bindings and ancestry checks; rewrite ⇒ verification failure (§10) | Low |
 | Gaming promotion cascades | Promotion requires its own signed evidence and re-runs the full decision (§7.3) | Low |
 
 ## 12. Open questions
@@ -470,6 +820,15 @@ Given a component `C`, a proposed release at commit `TO`, and previous tag `FROM
 6. **Naming.** *Resolved (v0.2):* the scheme is SemVer-Trust, hosted at `github.com/semver-trust`, with predicate-type URIs bound to `semver-trust.dev` (specification repository ADR-013). The `t` identifier is final. This entry is retained for numbering stability.
 7. **Security-patch velocity vs. channel demotion.** Under `strategy = "demote"`, an under-evidenced security fix lands in the pre-release channel that default resolvers do not select — the scheme can slow patch propagation exactly when speed matters most, and any expedite carve-out is a door an attacker will label "security fix" to walk through. Candidate directions, all unproven: expedited *review* SLAs rather than expedited channels; advisory-linked promotion (a patch promotes when a linked advisory is published by a distinct accountable identity); accepting the tension and documenting emergency response as out of band. This is currently the scheme's strongest known internal counterargument.
 8. **Empirical validation of the trust–outcome link.** The keystone empirical claim — that trust levels correlate with outcome risk — is untested. Retrospective trust profiling of existing repositories against vulnerability and incident history (see the reference-implementation roadmap) is the designated test. A null result does not void the scheme (Principle 6) but would reposition it as accountability infrastructure rather than a risk signal, and should reshape default policy tables.
+9. **Authoritative current state and freshness.** Signatures and predecessor
+   links prove an internally consistent chain but cannot prove that a verifier
+   was shown its newest accepted head or latest superseding decision. A hidden
+   successor, promotion, or demotion is a rollback/freeze attack, not a
+   signature failure. The successor predicate/profile work must define source-
+   and version-head discovery and conflict resolution, likely through
+   verifier-pinned state or a transparency mechanism with freshness evidence.
+   Until then, v0.4 continuity claims are relative to the verifier's supplied
+   accepted heads, not globally latest state.
 
 ---
 
@@ -530,6 +889,36 @@ human               |   T2   |   T2   |   T3**
   or the trust-suffix grammar; the additions above state an existing parse reservation, add an optional
   range anchor, and register optional policy vocabulary. Conformance vectors gained additive classification
   cases and re-pinned `spec_version: "0.3"`; no vector files change in this pass.
+
+## Appendix E: Changes from v0.3
+
+- §5.2 and §10 replace ambiguous producer-selected `FROM..TO` ranges with
+  explicit inception, adoption, and recurring reachability sets. Inception
+  includes every reachable root; adoption includes the boundary while exempting
+  its parent history; recurrence chains to the accepted predecessor attestation
+  (ADR-027, superseding ADR-026).
+- §5.4, §9, and §10 replace self-authorizing `TO` policy loading with an
+  out-of-band bootstrap authority at chain genesis and previous-policy
+  governance thereafter. Candidate policy and key changes activate only after
+  an accepted release (ADR-028, superseding ADR-007).
+- §7.5 separates authenticated version ancestry from release intervals and
+  policy state. Bootstrap binds explicit new-line genesis or an immutable legacy
+  predecessor; recurrence derives target cores and trust iterations from
+  accepted version state rather than caller `current_version`/iteration inputs
+  (ADR-029).
+- §8.1 states the additional continuity/policy bindings required for v0.4 and
+  explicitly preserves predicate v0.1 as historical. Because v0.1 cannot carry
+  the new bindings, v0.4 release emission waits for a successor predicate URI
+  and schema.
+- New range, policy-transition, and version-ancestry conformance vectors cover
+  roots, boundaries, skipped/moved predecessors, bootstrap mismatch,
+  self-enrollment, meta-path weakening, mandatory-workflow removal, boundary
+  movement, role/clock mismatch, legacy version continuation, caller overrides,
+  prerelease re-cuts, target-lineage trust laundering, iteration derivation,
+  corrective advances, late attestation-only supersessions, and valid delayed
+  key/scope rotation.
+- No changes to trust-level assignment, scope-floor arithmetic, transitive
+  propagation, tag grammar, or the release decision table.
 
 ---
 
