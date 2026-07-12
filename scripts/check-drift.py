@@ -95,7 +95,8 @@ def check_spec() -> None:
     # Level table: parse section 3.2 rows and verify the accountability invariant
     rows = re.findall(
         r"^\| (agent|mixed / ambiguous|human) \| "
-        r"(none|agent \(independent\)|human(?: \(distinct identity\))?) \| \*\*(T[0-3])\*\* \|$",
+        r"(none|agent \(independent\)|"
+        r"human(?: \(distinct (?:identity|canonical actor)\))?) \| \*\*(T[0-3])\*\* \|$",
         t,
         re.M,
     )

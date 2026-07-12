@@ -9,7 +9,7 @@
   "predicateType": "https://semver-trust.dev/review/v0.2",
   "predicate": {
     "profile": {
-      "specification": { "name": "semver-trust", "version": "0.5" },
+      "specification": { "name": "semver-trust", "version": "0.6" },
       "predicate_contract": { "name": "review", "version": "0.2" },
       "evaluator": { "name": "semver-trust-fixture", "version": "0.0.0" },
       "repository_identity": { "name": "fixture-repository", "version": "0.1" },
@@ -24,23 +24,33 @@
     },
     "review_target": {
       "change": "pull-request:7",
+      "merge_context": "refs/heads/main",
       "source_revisions": [{ "id": "commit:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }],
       "target_revision": { "id": "commit:cccccccccccccccccccccccccccccccccccccccc" }
     },
     "reviewers": [
       {
-        "actor": "alice",
+        "actor": {
+          "id": "actor:human:alice",
+          "class": "human",
+          "digest": { "sha256": "1111111111111111111111111111111111111111111111111111111111111111" }
+        },
         "credential_identity": "alice@semver-trust.test",
         "class": "human",
         "verdict": "approved",
+        "approval_state": "active",
+        "coverage": "final_revision",
         "approved_revision": { "id": "commit:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+        "approved_diff": null,
+        "independent_context": null,
         "effective_at_merge": true
       }
     ],
     "merge": {
       "strategy": "merge",
       "capture_mode": "native",
-      "result_revision": { "id": "commit:cccccccccccccccccccccccccccccccccccccccc" }
+      "result_revision": { "id": "commit:cccccccccccccccccccccccccccccccccccccccc" },
+      "source_to_result": { "sha256": "2222222222222222222222222222222222222222222222222222222222222222" }
     },
     "timestamp": "2026-07-12T20:00:00Z"
   }

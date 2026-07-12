@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """check-conformance.py — independent validation of the SemVer-Trust conformance vectors.
 
-Validates the core, release-range, policy-transition, version-ancestry, and
-cryptographic vector files against a second, independent implementation of the
+Validates the core, release-range, policy-transition, version-ancestry,
+qualified-review, and cryptographic vector files against a second, independent implementation of the
 spec rules they encode (``spec/semver-trust.md`` §3.2-§3.3, §4.1-§4.2,
 §5.1-§5.4, §6.1-§6.4, §7.1-§7.5, §10, Appendix A). This is deliberately NOT the reference
 Go implementation, and it shares no code with ``scripts/check-drift.py`` — the
-SemVer comparator, level invariant, interval reachability, policy-transition
-and version-ancestry rules, scope/floor/propagation arithmetic, and decision
+SemVer comparator, level invariant, interval reachability, policy-transition,
+version-ancestry, and qualified-review rules, scope/floor/propagation arithmetic, and decision
 table are re-implemented here from first principles. Agreement between
 independent implementations is the point.
 
@@ -46,6 +46,7 @@ DECISION = CONFORMANCE / "decision.json"
 RANGE = CONFORMANCE / "range.json"
 VERSION_ANCESTRY = CONFORMANCE / "version-ancestry.json"
 POLICY_TRANSITION = CONFORMANCE / "policy-transition.json"
+REVIEW_QUALIFICATION = CONFORMANCE / "review-qualification.json"
 PREDICATE_V02 = CONFORMANCE / "predicate-v0.2.json"
 SIGNATURE = CONFORMANCE / "crypto" / "signature-vectors.json"
 ATTESTATION = CONFORMANCE / "crypto" / "attestations" / "attestation-vectors.json"
@@ -59,6 +60,7 @@ VECTOR_FILES = (
     RANGE,
     VERSION_ANCESTRY,
     POLICY_TRANSITION,
+    REVIEW_QUALIFICATION,
     PREDICATE_V02,
     SIGNATURE,
     ATTESTATION,
@@ -937,6 +939,57 @@ def _version_ancestry(doc: dict, inputs: dict) -> dict:
     }
 
 
+# §4.3 / ADR-031: only qualified approvals can contribute a review class. This
+# deliberately evaluates canonical actor ids, not credential strings.
+def _review_qualification(inputs: dict) -> dict:
+    authorship = inputs["authorship"]["class"]
+    author_actor = inputs["authorship"]["actor"]
+    review = inputs["review"]
+    merge = inputs["merge"]
+
+    def result(review_class: str, reason: str | None) -> dict:
+        return {
+            "review": review_class,
+            "level": invariant_level(authorship, review_class),
+            "reason": reason,
+        }
+
+    if review["verdict"] != "approved":
+        return result("none", "verdict_not_approved")
+    if review["approval_state"] != "active" or not review["effective_at_merge"]:
+        return result("none", "approval_not_active")
+    if not review["signed_attestation"]:
+        return result("none", "unsigned_attestation")
+    if review["credential_actor"] != review["actor"]:
+        return result("none", "credential_actor_mismatch")
+    if merge["post_approval_change"]:
+        return result("none", "post_approval_change")
+
+    coverage = review["coverage"]
+    if coverage == "final_revision":
+        if review["approved_revision"] != review["final_revision"]:
+            return result("none", "revision_mismatch")
+    elif coverage == "final_diff":
+        if merge["strategy"] not in {"squash", "rebase"} or merge["capture_mode"] != "pre_rewrite":
+            return result("none", "unsupported_final_diff_flow")
+        if review.get("approved_diff") != review.get("result_diff"):
+            return result("none", "diff_mismatch")
+    else:
+        return result("none", "unknown_coverage")
+
+    if review["class"] == "agent":
+        if review["actor"] == author_actor or not review.get("separate_context"):
+            return result("none", "agent_not_independent")
+        return result("agent_independent", None)
+
+    if review["class"] == "human":
+        if authorship == "human" and review["actor"] == author_actor:
+            return result("none", "same_canonical_actor")
+        return result("human_distinct", None)
+
+    return result("none", "unknown_reviewer_class")
+
+
 # ---- Checks ----------------------------------------------------------------
 def check_structure(docs: dict[str, dict]) -> None:
     ids: list[str] = []
@@ -1360,6 +1413,50 @@ def check_policy_transitions(doc: dict) -> None:
     )
 
 
+def check_review_qualification(vectors: list[dict]) -> None:
+    group = [vector for vector in vectors if vector.get("kind") == "review_qualification"]
+    check("review-qualification-group-nonempty", bool(group))
+    reasons = set()
+    positives = set()
+    for vector in group:
+        got = _review_qualification(vector["inputs"])
+        expected = vector["expected"]
+        if expected["reason"] is None:
+            positives.add(vector["id"])
+        else:
+            reasons.add(expected["reason"])
+        check(
+            f"review-qualification-{vector['id']}",
+            got == expected,
+            f"review qualification mismatch: computed {got}, vector says {expected}",
+        )
+    required_reasons = {
+        "verdict_not_approved",
+        "approval_not_active",
+        "revision_mismatch",
+        "post_approval_change",
+        "same_canonical_actor",
+        "agent_not_independent",
+    }
+    missing_reasons = required_reasons - reasons
+    check(
+        "review-qualification-negative-coverage",
+        not missing_reasons,
+        f"missing negative reasons: {sorted(missing_reasons)}",
+    )
+    required_positive_fragments = ("key-rotation", "distinct-human", "squash", "rebase")
+    missing_positive = [
+        fragment
+        for fragment in required_positive_fragments
+        if not any(fragment in vector_id for vector_id in positives)
+    ]
+    check(
+        "review-qualification-positive-coverage",
+        not missing_positive,
+        f"missing positive cases: {missing_positive}",
+    )
+
+
 def check_version_ancestry(doc: dict) -> None:
     vectors = [
         vector for vector in doc.get("vectors", []) if vector.get("kind") == "version_ancestry"
@@ -1738,6 +1835,7 @@ def main() -> int:
         check_git_interval_commands()
         check_version_ancestry(docs[VERSION_ANCESTRY.name])
         check_policy_transitions(docs[POLICY_TRANSITION.name])
+        check_review_qualification(docs[REVIEW_QUALIFICATION.name]["vectors"])
         check_predicate_v02_instances(docs[PREDICATE_V02.name]["vectors"])
         check_attestations(docs[ATTESTATION.name])
         check_format_gate()
