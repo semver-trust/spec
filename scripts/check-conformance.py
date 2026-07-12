@@ -46,8 +46,10 @@ DECISION = CONFORMANCE / "decision.json"
 RANGE = CONFORMANCE / "range.json"
 VERSION_ANCESTRY = CONFORMANCE / "version-ancestry.json"
 POLICY_TRANSITION = CONFORMANCE / "policy-transition.json"
+PREDICATE_V02 = CONFORMANCE / "predicate-v0.2.json"
 SIGNATURE = CONFORMANCE / "crypto" / "signature-vectors.json"
 ATTESTATION = CONFORMANCE / "crypto" / "attestations" / "attestation-vectors.json"
+SCHEMAS = ROOT / "schemas"
 VECTOR_FILES = (
     LEVELS,
     PRECEDENCE,
@@ -57,9 +59,16 @@ VECTOR_FILES = (
     RANGE,
     VERSION_ANCESTRY,
     POLICY_TRANSITION,
+    PREDICATE_V02,
     SIGNATURE,
     ATTESTATION,
 )
+PREDICATE_SCHEMAS = {
+    "https://semver-trust.dev/release/v0.1": "release-v0.1.json",
+    "https://semver-trust.dev/review/v0.1": "review-v0.1.json",
+    "https://semver-trust.dev/release/v0.2": "release-v0.2.json",
+    "https://semver-trust.dev/review/v0.2": "review-v0.2.json",
+}
 ATTESTATIONS_DIR = ATTESTATION.parent
 SPEC = ROOT / "spec" / "semver-trust.md"
 
@@ -964,6 +973,33 @@ def check_spec_version_matches_spec(version: str) -> None:
     )
 
 
+def check_predicate_schemas() -> None:
+    for predicate_type, schema_name in PREDICATE_SCHEMAS.items():
+        path = SCHEMAS / schema_name
+        try:
+            schema = json.loads(path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError) as exc:
+            check(f"schema-load-{schema_name}", False, str(exc))
+            continue
+        check(f"schema-load-{schema_name}", True)
+        try:
+            jsonschema.Draft202012Validator.check_schema(schema)
+            check(f"schema-draft202012-{schema_name}", True)
+        except jsonschema.SchemaError as exc:
+            check(f"schema-draft202012-{schema_name}", False, str(exc))
+        check(
+            f"schema-id-{schema_name}",
+            schema.get("$id") == f"https://semver-trust.dev/schemas/{schema_name}",
+            f"unexpected $id {schema.get('$id')!r}",
+        )
+        predicate_const = schema.get("properties", {}).get("predicateType", {}).get("const")
+        check(
+            f"schema-predicate-type-{schema_name}",
+            predicate_const == predicate_type,
+            f"expected {predicate_type}, got {predicate_const!r}",
+        )
+
+
 def check_levels(vectors: list[dict]) -> None:
     matrix = [v for v in vectors if v.get("kind") == "matrix"]
     classify = [v for v in vectors if v.get("kind") == "classify"]
@@ -1433,10 +1469,7 @@ def _schema_validates(payload: bytes) -> bool:
         stmt = json.loads(payload)
     except json.JSONDecodeError:
         return False
-    schema_file = {
-        "https://semver-trust.dev/release/v0.1": "release-v0.1.json",
-        "https://semver-trust.dev/review/v0.1": "review-v0.1.json",
-    }.get(stmt.get("predicateType"))
+    schema_file = PREDICATE_SCHEMAS.get(stmt.get("predicateType"))
     if schema_file is None:
         return False
     schema = json.loads((ROOT / "schemas" / schema_file).read_text(encoding="utf-8"))
@@ -1448,6 +1481,26 @@ def _schema_validates(payload: bytes) -> bool:
         schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER
     )
     return not list(validator.iter_errors(stmt))
+
+
+def _payload_schema_validates(path: Path) -> bool:
+    try:
+        payload = path.read_bytes()
+    except FileNotFoundError:
+        return False
+    return _schema_validates(payload)
+
+
+def check_predicate_v02_instances(vectors: list[dict]) -> None:
+    check("predicate-v02-group-nonempty", bool(vectors))
+    for vec in vectors:
+        payload = CONFORMANCE / vec["inputs"]["payload"]
+        got = _payload_schema_validates(payload)
+        check(
+            f"predicate-v02-{vec['id']}",
+            got == vec["expected"]["schema_valid"],
+            f"{payload.relative_to(ROOT)} schema_valid={got}",
+        )
 
 
 def check_format_gate() -> None:
@@ -1674,6 +1727,7 @@ def main() -> int:
     if len(docs) == len(VECTOR_FILES):
         check_structure(docs)
         check_spec_version_matches_spec(docs[LEVELS.name]["spec_version"])
+        check_predicate_schemas()
         check_levels(docs[LEVELS.name]["vectors"])
         check_precedence(docs[PRECEDENCE.name]["vectors"])
         check_grammar(docs[PRECEDENCE.name]["vectors"])
@@ -1684,6 +1738,7 @@ def main() -> int:
         check_git_interval_commands()
         check_version_ancestry(docs[VERSION_ANCESTRY.name])
         check_policy_transitions(docs[POLICY_TRANSITION.name])
+        check_predicate_v02_instances(docs[PREDICATE_V02.name]["vectors"])
         check_attestations(docs[ATTESTATION.name])
         check_format_gate()
         check_attestation_regeneration()

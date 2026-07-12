@@ -8,7 +8,7 @@ reference implementation treats them as acceptance tests, and any other implemen
 passing them.
 
 The Go reference implementation currently implements the draft v0.3 vector
-set. The v0.4 range, policy-transition, and version-ancestry groups in this
+set. The v0.4/v0.5 range, policy-transition, and version-ancestry groups in this
 revision are the source contract for its next coordinated, digest-pinned update.
 
 Each vector is derived directly from a normative section of the spec and carries a `spec` back-reference to
@@ -46,26 +46,29 @@ against these vectors.
 
 ## `spec_version` pinning
 
-Every vector file carries a top-level `spec_version` (currently `"0.4"`). It names the spec draft the vectors
+Every vector file carries a top-level `spec_version` (currently `"0.5"`). It names the spec draft the vectors
 encode, not the version of the vector set. The rules:
 
-- The vectors track the pinned spec draft. When they say `"0.4"`, their expectations are those of
-  `spec/semver-trust.md` **Draft v0.4**.
+- The vectors track the pinned spec draft. When they say `"0.5"`, their expectations are those of
+  `spec/semver-trust.md` **Draft v0.5**.
 - All vector files in this directory MUST share the same `spec_version`; the validator enforces this and
   cross-checks it against the spec's draft header.
-- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.4 level and
+- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.5 level and
   precedence vectors" is the precise claim.
 
 The frozen v0.1 DSSE fixtures retain their v0.1 predicate bytes while their
-vector envelope is pinned to spec draft 0.4. Passing those vectors proves
+vector envelope is pinned to spec draft 0.5. Passing those vectors proves
 **backward verification** of historical v0.1 attestations only. It does not make
-v0.1 sufficient for a v0.4 release-conformance claim; §8.1 requires a successor
-predicate before v0.4 release emission.
+v0.1 sufficient for a v0.5 release-conformance claim; §8.1 requires the v0.2
+successor predicate before v0.5 release emission.
 
 The range, policy-transition, and version-ancestry files isolate independent
 dimensions for precise failures. Their authority fixtures are projections, not
 three alternative wire formats: a real accepted successor combines every
 source-interval, policy, and version-state field required by §8.1.
+`predicate-v0.2.json` adds unsigned positive and negative in-toto Statement
+payload fixtures for the successor schemas; signed v0.2 DSSE fixtures remain
+follow-up implementation work.
 
 ## Vector format
 
@@ -74,7 +77,7 @@ Every vector file shares an envelope:
 ```json
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.4",
+  "spec_version": "0.5",
   "description": "…what this file covers…",
   "vectors": [ /* … */ ]
 }

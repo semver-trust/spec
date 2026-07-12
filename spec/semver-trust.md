@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # SemVer-Trust: Provenance-Scoped Trust Levels for Semantic Versioning
 
-**Draft v0.4**
+**Draft v0.5**
 **Status:** Design draft for review
 **Date:** 2026-07-12
 **Canonical home:** https://semver-trust.dev · https://github.com/semver-trust/spec
@@ -145,7 +145,7 @@ Every commit on a protected branch MUST be signed. The **identity class** of the
 
 Review facts live outside git (platform PR approvals), so they MUST be captured into the provenance record at merge time:
 
-1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.1` whose subjects are the merged commit SHAs, recording: reviewer identities and their classes (human/agent), approval verdicts, the PR/MR reference, and the merge strategy used.
+1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer identities and their classes (human/agent), approval verdicts, the PR/MR reference, covered revisions, final-revision approval state, canonical actor identities, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.5 release-conformance claims.
 2. The attestation MUST be signed by the workflow's workload identity and stored per §8.2.
 3. **Merge strategies:** squash and rebase merges rewrite authorship and destroy per-commit provenance. Repositories MUST either (a) forbid squash/rebase merges on protected branches, or (b) ensure the merge-time attestation records the pre-squash commit provenance so the resulting single commit can be classified from attested facts.
 4. **Merge commits themselves:** a merge commit with a non-empty diff (conflict resolution) introduces authored changes. It MUST be classified like any other commit — the resolver is its author; the review attestation covering the PR does not automatically cover novel conflict-resolution hunks unless the reviewer re-approved after resolution.
@@ -598,7 +598,12 @@ Across predicate versions, the **provenance vector** (per-commit authorship and
 review classes) MUST be preserved even though the tag carries only the scalar
 level (§3.2), and `supersedes` links promotion/demotion decisions.
 
-A v0.4 release attestation MUST additionally bind the interval mode and resolved
+The successor release predicate type is `https://semver-trust.dev/release/v0.2`.
+It is the first release predicate allowed to claim v0.5/v0.4 trust-chain
+conformance. Its schema is `schemas/release-v0.2.json`; the matching review
+successor is `https://semver-trust.dev/review/v0.2`.
+
+A v0.5 release attestation MUST additionally bind the interval mode and resolved
 `TO`; the resolved adoption boundary for adoption mode; the cryptographic
 identity of the accepted predecessor attestation for recurring mode; the active
 policy and role-separated trust-material digests that evaluated the interval;
@@ -611,14 +616,21 @@ derived iteration where applicable; the target lineage's accepted interval
 identities and aggregate evidence; and the bootstrap descriptor or predecessor
 that selected the active state.
 Predicate v0.1 cannot express those continuity claims and MUST NOT be used to
-claim v0.4 release conformance. This draft does not change existing v0.1 bytes
+claim v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
 or fixture expectations and assigns them no v0.4 continuity meaning. Because
-v0.1 did not encode its evaluator/specification profile, the successor
-compatibility work must make its legacy verification profiles explicit. A
-successor predicate URI and schema are required before v0.4 release attestations
-can be emitted; this draft does not assign that URI.
+v0.1 did not encode its evaluator/specification profile, v0.2 successor
+attestations MUST bind explicit specification, predicate, evaluator,
+repository-identity, graph, policy, actor-identity where applicable, and
+verification-time profiles. Successor schemas are closed except for declared
+extension maps; any change that alters validation or interpretation requires a
+new predicate URI and schema. Predicate v0.2 review emission remains blocked
+until qualified-review and canonical-actor semantics are settled (§12); if that
+work needs facts v0.2 cannot express, a new `review/v0.3` predicate is required.
+Version-state identities in `release/v0.2` carry a digest plus a
+canonicalization profile; v0.2 emission is blocked until that profile is
+implemented by emitters and reproducible by verifiers.
 
-Migration from v0.1 establishes a new authenticated v0.4 chain genesis. The
+Migration from v0.1 establishes a new authenticated v0.5 chain genesis. The
 bootstrap descriptor MAY independently pin a selected legacy `TO` as an included
 adoption boundary and a canonical clean legacy tag as a version predecessor when
 each satisfies §5.2 and §7.5. Neither binding implies the other: the version
@@ -824,11 +836,12 @@ decision selected for superseding re-evaluation:
    links prove an internally consistent chain but cannot prove that a verifier
    was shown its newest accepted head or latest superseding decision. A hidden
    successor, promotion, or demotion is a rollback/freeze attack, not a
-   signature failure. The successor predicate/profile work must define source-
-   and version-head discovery and conflict resolution, likely through
-   verifier-pinned state or a transparency mechanism with freshness evidence.
-   Until then, v0.4 continuity claims are relative to the verifier's supplied
-   accepted heads, not globally latest state.
+   signature failure. Predicate v0.2 binds the verifier's accepted attestation
+   set and verification instant, but profiles that need freshness MUST also
+   define source- and version-head discovery and conflict resolution, likely
+   through verifier-pinned state or a transparency mechanism with freshness
+   evidence. Until then, continuity claims are relative to the verifier's
+   supplied accepted heads, not globally latest state.
 
 ---
 
@@ -908,8 +921,8 @@ human               |   T2   |   T2   |   T3**
   (ADR-029).
 - §8.1 states the additional continuity/policy bindings required for v0.4 and
   explicitly preserves predicate v0.1 as historical. Because v0.1 cannot carry
-  the new bindings, v0.4 release emission waits for a successor predicate URI
-  and schema.
+  the new bindings, v0.4 release emission waited for a successor predicate URI
+  and schema, now assigned in Appendix F.
 - New range, policy-transition, and version-ancestry conformance vectors cover
   roots, boundaries, skipped/moved predecessors, bootstrap mismatch,
   self-enrollment, meta-path weakening, mandatory-workflow removal, boundary
@@ -919,6 +932,23 @@ human               |   T2   |   T2   |   T3**
   key/scope rotation.
 - No changes to trust-level assignment, scope-floor arithmetic, transitive
   propagation, tag grammar, or the release decision table.
+
+## Appendix F: Changes from v0.4
+
+- §4.3 and §8.1 assign successor predicate types
+  `https://semver-trust.dev/release/v0.2` and
+  `https://semver-trust.dev/review/v0.2` (ADR-030). Predicate v0.1 remains
+  historical and is not extended in place.
+- §8.1 makes explicit profile identity mandatory for successor release and
+  review attestations: specification, predicate contract, evaluator,
+  repository identity, graph/policy or actor/source-control profile, and
+  verification-time profile.
+- Successor schemas `schemas/release-v0.2.json` and
+  `schemas/review-v0.2.json` register the compatibility-critical envelope and
+  state bindings for v0.5/v0.4 trust-chain conformance.
+- Schema evolution now uses a new predicate URI for any change that alters
+  validation or interpretation; additive optional fields inside a closed
+  emitted schema are not a compatibility mechanism.
 
 ---
 

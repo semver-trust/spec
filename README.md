@@ -22,7 +22,7 @@ behind this release's claims*.
 
 ## Read the specification
 
-**[SemVer-Trust specification — draft v0.4](spec/semver-trust.md)**
+**[SemVer-Trust specification — draft v0.5](spec/semver-trust.md)**
 
 New readers: start with §1 (principles), §3 (the trust model), and
 Appendix A (a worked monorepo example). The project keeps its full
@@ -37,21 +37,23 @@ decision is the way it is.
 | [docs/design-record.md](docs/design-record.md) | Design rationale, QA record, and the agent handoff contract | CC BY 4.0 |
 | [docs/adr/](docs/adr/README.md) | Decision log — one file per architecture decision record | CC BY 4.0 |
 | [docs/analysis/](docs/analysis/2026-07-04-steelman.md) | Adversarial (steelman) analyses and standing predictions | CC BY 4.0 |
-| [release/](release/v0.1.md) · [review/](review/v0.1.md) | Predicate-type definitions, resolvable at `semver-trust.dev` | CC BY 4.0 |
+| [release/](release/v0.2.md) · [review/](review/v0.2.md) | Predicate-type definitions, resolvable at `semver-trust.dev` | CC BY 4.0 |
 | [schemas/](schemas/README.md) | JSON Schemas for the attestation predicates | Apache 2.0 |
 | `conformance/` | Conformance vectors — the sync contract for implementations | Apache 2.0 |
 | `scripts/` | Repository consistency checks (`check-drift.py`) | Apache 2.0 |
 
 ## Status
 
-The specification is a **v0.4 working draft**. The official Go
+The specification is a **v0.5 working draft**. The official Go
 implementation ([semver-trust-go](https://github.com/semver-trust/semver-trust-go))
 passes the draft v0.3 conformance suite and releases itself under the scheme
 (v0.1.0 and v0.2.0 are published, verified, reproducible dogfood). The legacy
-release path is not suitable for production claims until the successor protocol
-and conformance contract land. Draft v0.4 adds release-interval,
-policy-transition, and authenticated version-ancestry vectors that are pending
-implementation. Design discussion happens in [issues](https://github.com/semver-trust/spec/issues) — see
+release path is not suitable for production claims until the v0.5 successor
+predicate behavior is implemented and covered by coordinated conformance
+fixtures. Draft v0.4 added release-interval, policy-transition, and
+authenticated version-ancestry vectors; draft v0.5 assigns successor
+release/review predicate types and schemas for the compatibility-critical state
+bindings. Design discussion happens in [issues](https://github.com/semver-trust/spec/issues) — see
 [CONTRIBUTING](CONTRIBUTING.md) before opening a pull request.
 
 ## License and trademark
