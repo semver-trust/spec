@@ -35,6 +35,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-027 | [Release intervals are explicit and every recurring release chains to the accepted predecessor](0027-release-intervals-are-explicit-and-every-recurring-release-chains-to-the-accepted-predecessor.md) | Accepted (2026-07-12) |
 | ADR-028 | [Bootstrap trust anchors and the previously accepted policy govern policy transitions](0028-bootstrap-trust-anchors-and-the-previously-accepted-policy-govern-policy-transitions.md) | Accepted (2026-07-12) |
 | ADR-029 | [Version ancestry is authenticated independently from release intervals](0029-version-ancestry-is-authenticated-independently-from-release-intervals.md) | Accepted (2026-07-12) |
+| ADR-030 | [Predicate v0.1 is historical and successor predicates carry explicit profile identity](0030-predicate-v0-1-is-historical-and-successor-predicates-carry-explicit-profile-identity.md) | Accepted (2026-07-12) |
 
 ## Adding an ADR
 
