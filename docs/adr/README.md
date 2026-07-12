@@ -30,6 +30,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-022 | [Attestation signatures are SSHSIG over the DSSE PAE with purpose-binding namespaces](0022-attestation-signatures-are-sshsig-over-the-dsse-pae-with-purpose-binding-namespaces.md) | Accepted (2026-07-11) |
 | ADR-023 | [Merge commits are created locally, signed and trailered, never by web-flow](0023-merge-commits-are-created-locally-signed-and-trailered-never-by-web-flow.md) | Accepted (2026-07-11) |
 | ADR-024 | [Adoption boundary: pre-scheme history is exempt, disclosed, and policy-pinned](0024-adoption-boundary-pre-scheme-history-is-exempt-disclosed-and-policy-pinned.md) | Accepted (2026-07-11) |
+| ADR-025 | [Self-review exclusion prevents double-counting, not first-counting](0025-self-review-exclusion-prevents-double-counting-not-first-counting.md) | Accepted (2026-07-12) |
 
 ## Adding an ADR
 

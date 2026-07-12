@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # SemVer-Trust: Provenance-Scoped Trust Levels for Semantic Versioning
 
-**Draft v0.2**
+**Draft v0.3**
 **Status:** Design draft for review
 **Date:** 2026-07-03
 **Canonical home:** https://semver-trust.dev · https://github.com/semver-trust/spec
@@ -80,7 +80,7 @@ Per-commit levels are assigned from the full authorship × review matrix. Author
 Notes:
 
 - *Ambiguous* means the signer identity class and the provenance trailers conflict, or required trailers are absent under a policy that mandates them. Ambiguity MUST floor to the agent-authored row — unverifiable claims of human authorship are treated as absent.
-- A human reviewing their own commit does not count as review. T3 requires distinct verified identities.
+- The self-review exclusion prevents one human from counting twice, never from counting once: a human reviewing their own *human-authored* commit adds no second human (T3 requires distinct verified identities), but for agent-, mixed-, or ambiguous-authored commits — where no human author is counted — a signed human review adds the first accountable human even when the reviewer is the commit's signer (agent + human = T2; spec repository ADR-025). Anything else would punish the honest `Provenance: agent` trailer: omitting it would classify the commit human-authored and reach T2 directly.
 - Multiple unverified co-authors (e.g., `Co-authored-by:` trailers without signatures) do not raise a commit above T2. Only signature-verified or platform-attested identities count.
 - The scalar is deliberately lossy: `human + none` and `agent + human` both map to T2. Policies that need the distinction MUST consume the full **provenance vector** in the attestation (§8.1), which preserves authorship and review classes separately. The scalar exists for tag encoding and precedence; the vector exists for policy.
 
@@ -491,6 +491,18 @@ human               |   T2   |   T2   |   T3**
 - §12.6 naming resolved (ADR-013); predicate-type URIs bound to `semver-trust.dev` in §4.3 and §8.1. The review predicate version was aligned from `v1` to `v0.1` to match specification maturity — permissible only because no attestation has yet been emitted.
 - New open questions: §12.7 (security-patch velocity vs. channel demotion) and §12.8 (empirical validation of the trust–outcome link), from the adversarial review at `docs/analysis/2026-07-02-steelman.md`.
 - No changes to the trust taxonomy, level assignment, aggregation, propagation, encoding grammar, decision tables, or verification algorithm.
+
+
+## Appendix D: Changes from v0.2
+
+- §3.2 note 2 clarified (spec repository ADR-025): the self-review exclusion prevents one human from
+  counting twice, not from counting once — same-identity human review of agent-, mixed-, or
+  ambiguous-authored commits counts as the single accountable human (T2). Surfaced by the reference
+  implementation's own first-release ceremony, where honestly agent-trailered commits signed and
+  post-hoc-reviewed by the sole maintainer classified T0 under the stricter misreading.
+- No other changes to the trust taxonomy, level assignment, aggregation, propagation, encoding grammar,
+  decision tables, or verification algorithm; conformance vectors gained additive classification cases
+  and re-pinned `spec_version: "0.3"`.
 
 ---
 

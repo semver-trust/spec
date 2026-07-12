@@ -37,14 +37,14 @@ against these vectors.
 
 ## `spec_version` pinning
 
-Every vector file carries a top-level `spec_version` (currently `"0.2"`). It names the spec draft the vectors
+Every vector file carries a top-level `spec_version` (currently `"0.3"`). It names the spec draft the vectors
 encode, not the version of the vector set. The rules:
 
-- The vectors track the pinned spec draft. When they say `"0.2"`, their expectations are those of
-  `spec/semver-trust.md` **Draft v0.2**.
+- The vectors track the pinned spec draft. When they say `"0.3"`, their expectations are those of
+  `spec/semver-trust.md` **Draft v0.3**.
 - All vector files in this directory MUST share the same `spec_version`; the validator enforces this and
   cross-checks it against the spec's draft header.
-- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.2 level and
+- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.3 level and
   precedence vectors" is the precise claim.
 
 ## Vector format
@@ -54,7 +54,7 @@ Both files share an envelope:
 ```json
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.2",
+  "spec_version": "0.3",
   "description": "…what this file covers…",
   "vectors": [ /* … */ ]
 }
@@ -95,7 +95,7 @@ function end to end.
 | `inputs.review` | object or null | Review facts, or `null` when there is no review. |
 | `inputs.review.reviewer_identity_class` | string | `human` or `agent`. |
 | `inputs.review.reviewer_identity` | string | The reviewer's identity. |
-| `inputs.review.author_identity` | string | The author's identity, for the distinct-identity test (§3.3(2), §3.2 note 2). |
+| `inputs.review.author_identity` | string | The commit's verified **signer principal** (the name predates ADR-025's clarification). Same-identity tests: disqualifies agent review (§3.3(2)); for human review it prevents double-counting only — a same-identity human review of agent/mixed/ambiguous-authored work still counts as the one accountable human (§3.2 note 2, ADR-025). |
 | `inputs.review.separate_context` | bool | Whether the reviewer ran with no shared state (§3.3(1)). |
 | `inputs.review.signed_attestation` | bool | Whether a signed review attestation exists (§3.3(3)). |
 | `expected.authorship` | string | Derived authorship class. |
