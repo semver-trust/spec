@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # ADR-024 — Adoption boundary: pre-scheme history is exempt, disclosed, and policy-pinned
 
-**Status:** Accepted (2026-07-11)
+**Status:** Superseded by ADR-026 (2026-07-12)
 **Date:** 2026-07-11
 **Decision:** a repository MAY declare an **adoption boundary** in its policy file — a single commit (by SHA
 or tag) before which history is exempt from verification. With a boundary declared, a first release verifies

@@ -171,7 +171,7 @@ own_trust(scope) = min over commits c in range, c touches scope:
 
 A commit that fails signature verification, or whose required attestations cannot be located and verified, has no level: verification of the release MUST fail (§10). Unverifiable is not T0 — T0 is a verified fact about a verified commit.
 
-**Adoption boundary (optional).** A repository whose earliest history predates the scheme — or is otherwise unverifiable (a lost signing key, a platform migration) — MAY declare a single **adoption boundary** in its policy file (§9, `[policy] adoption_boundary`): a commit, named by SHA or tag, before which history is exempt. With a boundary declared, a first release verifies `boundary..TO` in place of `root..TO`; a release anchored at a previously verified tag is unaffected. Three properties bind the boundary. It is **policy-pinned** — the boundary lives only in the policy file, never in a command-line argument or environment, so moving it is itself a meta-path commit that MUST meet the required meta level (§5.4), and the §8.1 pinned policy digest freezes which boundary produced each decision. It is **disclosed** — a release whose range begins at the boundary MUST mark this in its attestation (the additive `range.from_is_adoption_boundary` field, §8.1), because "verified since the boundary" and "verified since inception" are different claims a consumer must be able to tell apart. It is **exempt, never laundered** — commits before the boundary contribute no trust level at all: they lie outside every range and are reported as out-of-scope, never as T0 (unverifiable is not T0). The boundary moves where verification *starts*, visibly; it never weakens what verification *means* within the region it covers. See spec repository ADR-024.
+**Adoption boundary (optional).** A repository whose earliest history predates the scheme — or is otherwise unverifiable (a lost signing key, a platform migration) — MAY declare a single **adoption boundary** in its policy file (§9, `[policy] adoption_boundary`): a commit, named by SHA or tag, before which history is exempt. With a boundary declared, a first release verifies `boundary..TO` in place of `root..TO`; a release anchored at a previously verified tag is unaffected. Three properties bind the boundary. It is **policy-pinned** — the boundary lives only in the policy file, never in a command-line argument or environment, so moving it is itself a meta-path commit that MUST meet the required meta level (§5.4), and the §8.1 pinned policy digest freezes which boundary produced each decision. It is **disclosed** — a release whose range begins at the boundary MUST mark this in its attestation (the additive `range.from_is_adoption_boundary` field, §8.1), because "verified since the boundary" and "verified since inception" are different claims a consumer must be able to tell apart. It is **exempt, never laundered** — commits before the boundary contribute no trust level at all: they lie outside every range and are reported as out-of-scope, never as T0 (unverifiable is not T0). The boundary moves where verification *starts*, visibly; it never weakens what verification *means* within the region it covers. See spec repository ADR-026, superseding ADR-024.
 
 ### 5.3 Transitive propagation (effective trust)
 
@@ -366,7 +366,7 @@ The policy file is TOML, lives in the repository, and is itself a meta-path (§5
 version   = "0.1"
 threshold = "T2"        # minimum effective trust for the clean channel
 strategy  = "demote"    # "demote" (recommended) | "inflate"
-# adoption_boundary = "v0.0.0"   # optional (§5.2, ADR-024): commit/tag before which history is exempt
+# adoption_boundary = "v0.0.0"   # optional (§5.2, ADR-026): commit/tag before which history is exempt
 
 [scopes]
 "services/auth/**"    = "auth"
@@ -426,7 +426,7 @@ coverage_min_changed_lines  = 0.70
 dist_tag_prefix = "trust-"
 ```
 
-Three fields above are optional and absent by default. `[policy] adoption_boundary` (§5.2, ADR-024) exempts pre-boundary history. `[identity.human] gpg_keyring` names an armored OpenPGP public keyring for GPG-signed commits — the OpenPGP counterpart to the SSH `allowed_signers` registry. `[identity] attestation_signers` names the registry of keys trusted to sign review and release attestations (SSHSIG over the DSSE PAE, §4.3, §8.2). A verifier MAY default its trust-material paths from these policy fields when the corresponding inputs are not supplied out-of-band; an explicitly supplied path overrides the policy.
+Three fields above are optional and absent by default. `[policy] adoption_boundary` (§5.2, ADR-026, superseding ADR-024) exempts pre-boundary history. `[identity.human] gpg_keyring` names an armored OpenPGP public keyring for GPG-signed commits — the OpenPGP counterpart to the SSH `allowed_signers` registry. `[identity] attestation_signers` names the registry of keys trusted to sign review and release attestations (SSHSIG over the DSSE PAE, §4.3, §8.2). A verifier MAY default its trust-material paths from these policy fields when the corresponding inputs are not supplied out-of-band; an explicitly supplied path overrides the policy.
 
 ## 10. Verification algorithm (normative)
 
@@ -518,12 +518,12 @@ human               |   T2   |   T2   |   T3**
   never reinterpreted as a plain pre-release. This states in normative text the fail-closed rule the
   conformance grammar vectors already enforce; the spoofing-surface and single-digit-cap rationale is the
   ADR-010 context. No change to the trust-suffix grammar itself.
-- §5.2 and §10 step 2 mirror the adoption boundary (spec repository ADR-024): a policy MAY declare one
+- §5.2 and §10 step 2 mirror the adoption boundary (spec repository ADR-024, superseded by ADR-026): a policy MAY declare one
   policy-pinned `[policy] adoption_boundary`; a first release then verifies `boundary..TO` in place of
   `root..TO`. The boundary is disclosed in the release attestation (§8.1 `range.from_is_adoption_boundary`)
   and pre-boundary history is exempt, contributing no trust level at all — never laundered to T0.
 - §9 documents three optional policy fields the reference implementation already recognizes: `[policy]
-  adoption_boundary` (ADR-024), `[identity.human] gpg_keyring` (armored OpenPGP commit-signer registry),
+  adoption_boundary` (ADR-024, superseded by ADR-026), `[identity.human] gpg_keyring` (armored OpenPGP commit-signer registry),
   and `[identity] attestation_signers` (the SSHSIG-over-DSSE attestation-signer registry, §4.3, §8.2,
   ADR-022). All three default to absent; a verifier MAY default trust-material paths from them.
 - No changes to the trust taxonomy, level assignment, aggregation semantics, propagation, decision tables,
