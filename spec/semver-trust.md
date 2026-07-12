@@ -171,6 +171,8 @@ own_trust(scope) = min over commits c in range, c touches scope:
 
 A commit that fails signature verification, or whose required attestations cannot be located and verified, has no level: verification of the release MUST fail (§10). Unverifiable is not T0 — T0 is a verified fact about a verified commit.
 
+**Adoption boundary (optional).** A repository whose earliest history predates the scheme — or is otherwise unverifiable (a lost signing key, a platform migration) — MAY declare a single **adoption boundary** in its policy file (§9, `[policy] adoption_boundary`): a commit, named by SHA or tag, before which history is exempt. With a boundary declared, a first release verifies `boundary..TO` in place of `root..TO`; a release anchored at a previously verified tag is unaffected. Three properties bind the boundary. It is **policy-pinned** — the boundary lives only in the policy file, never in a command-line argument or environment, so moving it is itself a meta-path commit that MUST meet the required meta level (§5.4), and the §8.1 pinned policy digest freezes which boundary produced each decision. It is **disclosed** — a release whose range begins at the boundary MUST mark this in its attestation (the additive `range.from_is_adoption_boundary` field, §8.1), because "verified since the boundary" and "verified since inception" are different claims a consumer must be able to tell apart. It is **exempt, never laundered** — commits before the boundary contribute no trust level at all: they lie outside every range and are reported as out-of-scope, never as T0 (unverifiable is not T0). The boundary moves where verification *starts*, visibly; it never weakens what verification *means* within the region it covers. See spec repository ADR-024.
+
 ### 5.3 Transitive propagation (effective trust)
 
 Scopes are not independent: components consume other components inside the same workspace. Effective trust propagates as a floor over the internal dependency graph:
@@ -265,6 +267,7 @@ Examples: `v1.4.0-t1.1`, `auth/v2.0.0-t0.3`, `pkg/common/v0.9.0` (clean).
 - The trust identifier occupies SemVer pre-release position, so `v1.4.0-t1.1 < v1.4.0` by SemVer precedence, and default dependency-range resolution in Go modules, npm, and Cargo will not select it. **Low-trust releases are opt-in by construction**, with zero consumer-side tooling.
 - Levels are a fixed single digit. (Lexical ASCII comparison of alphanumeric identifiers would order `t10 < t2`; capping at one digit forecloses the hazard.)
 - Component paths follow the ecosystem's nested-tag convention where one exists (Go nested modules use exactly this `dir/vX.Y.Z` prefix form).
+- **The trust-shaped namespace is reserved.** A pre-release whose first dot-separated identifier matches the trust shape — `t` immediately followed by a level digit — is reserved for this scheme. A well-formed trust suffix is a trust version; a trust-shaped identifier that does *not* satisfy the grammar (a two-digit level, a missing or zero iteration, or a level outside `0`–`3` — e.g. `t10.1`, `t1`, `t1.0`, `t4.1`) is **invalid and MUST be rejected**, never reinterpreted as an ordinary pre-release. Reinterpreting a malformed trust identifier as a plain pre-release would both silently discard intended trust information and open a spoofing surface — a tag that reads as a trust encoding to a human while carrying no verified meaning — so parsing fails closed, exactly as the conformance grammar vectors require. Non-trust pre-releases (`rc.1`, `alpha`, …) carry no trust information and are unaffected: they remain ordinary pre-releases with the trust suffix simply absent.
 
 ### 7.2 Precedence interactions and the rc question
 
@@ -312,7 +315,7 @@ Release attestations are in-toto Statements (`https://in-toto.io/Statement/v1`).
   "predicateType": "https://semver-trust.dev/release/v0.1",
   "predicate": {
     "component": "auth",
-    "range": { "from": "auth/v1.3.2", "to": "8c1f2e…" },
+    "range": { "from": "auth/v1.3.2", "to": "8c1f2e…", "from_is_adoption_boundary": false },
     "trust": {
       "effective": "T1",
       "own": "T3",
@@ -346,7 +349,7 @@ Release attestations are in-toto Statements (`https://in-toto.io/Statement/v1`).
 }
 ```
 
-Normative points: the **provenance vector** (per-commit authorship and review classes) MUST be preserved even though the tag carries only the scalar level (§3.2); the policy file digest MUST be pinned so a decision is reproducible against the exact policy that produced it; `supersedes` links promotion/demotion chains.
+Normative points: the **provenance vector** (per-commit authorship and review classes) MUST be preserved even though the tag carries only the scalar level (§3.2); the policy file digest MUST be pinned so a decision is reproducible against the exact policy that produced it; `range.from_is_adoption_boundary` discloses when a first release's range begins at a policy-declared adoption boundary (§5.2) rather than at the repository root, a distinction consumers MUST be able to make; `supersedes` links promotion/demotion chains.
 
 ### 8.2 Storage and verification of attestations
 
@@ -363,6 +366,7 @@ The policy file is TOML, lives in the repository, and is itself a meta-path (§5
 version   = "0.1"
 threshold = "T2"        # minimum effective trust for the clean channel
 strategy  = "demote"    # "demote" (recommended) | "inflate"
+# adoption_boundary = "v0.0.0"   # optional (§5.2, ADR-024): commit/tag before which history is exempt
 
 [scopes]
 "services/auth/**"    = "auth"
@@ -393,8 +397,14 @@ inputs  = ["**/*.go"]
 command = "gofmt -l -w ."
 outputs = ["**/*.go"]               # formatting-only degenerate derivation (§4.4)
 
+[identity]
+# registry of keys trusted to sign review/release attestations — SSHSIG over the
+# DSSE PAE (§4.3, §8.2, ADR-022); ssh allowed-signers format. Optional.
+attestation_signers = ".semver-trust/attestation_signers"
+
 [identity.human]
 allowed_signers = ".semver-trust/allowed_signers"   # ssh allowed-signers format
+gpg_keyring     = ".semver-trust/gpg-keyring.asc"   # armored OpenPGP public keyring (optional)
 oidc_issuers    = ["https://accounts.example.com"]  # gitsign identities mapped to people
 
 [identity.agent]
@@ -416,12 +426,14 @@ coverage_min_changed_lines  = 0.70
 dist_tag_prefix = "trust-"
 ```
 
+Three fields above are optional and absent by default. `[policy] adoption_boundary` (§5.2, ADR-024) exempts pre-boundary history. `[identity.human] gpg_keyring` names an armored OpenPGP public keyring for GPG-signed commits — the OpenPGP counterpart to the SSH `allowed_signers` registry. `[identity] attestation_signers` names the registry of keys trusted to sign review and release attestations (SSHSIG over the DSSE PAE, §4.3, §8.2). A verifier MAY default its trust-material paths from these policy fields when the corresponding inputs are not supplied out-of-band; an explicitly supplied path overrides the policy.
+
 ## 10. Verification algorithm (normative)
 
 Given a component `C`, a proposed release at commit `TO`, and previous tag `FROM`:
 
 1. **Load policy** from `TO`'s tree; record its digest. Verify the policy file's own history within `FROM..TO` satisfies §5.4 (meta-path level); on failure, **abort**.
-2. **Enumerate commits**: `git rev-list FROM..TO` (root..`TO` for a first release). History rewrites on the protected branch invalidate prior tags' ranges and MUST be treated as verification failure.
+2. **Enumerate commits**: `git rev-list FROM..TO` (for a first release, `root..TO` — or `boundary..TO` when the policy declares an adoption boundary, §5.2). History rewrites on the protected branch invalidate prior tags' ranges and MUST be treated as verification failure.
 3. **Per commit**: verify the signature and resolve the signer's identity class (§4.2); read trailers (§4.1); locate and cryptographically verify the covering review attestation (§4.3). Any commit that cannot be verified end-to-end → **abort** (unverifiable ≠ T0, §5.2). Assign the level per §3.2.
 4. **Apply derivation proofs** (§4.4): re-run each rule against `TO`'s tree; on byte-identical outputs, re-level output paths to the inputs' floor.
 5. **Partition by scope** (§5.1) using each commit's diff paths; compute `own_trust` per touched scope (§5.2).
@@ -500,9 +512,24 @@ human               |   T2   |   T2   |   T3**
   ambiguous-authored commits counts as the single accountable human (T2). Surfaced by the reference
   implementation's own first-release ceremony, where honestly agent-trailered commits signed and
   post-hoc-reviewed by the sole maintainer classified T0 under the stricter misreading.
-- No other changes to the trust taxonomy, level assignment, aggregation, propagation, encoding grammar,
-  decision tables, or verification algorithm; conformance vectors gained additive classification cases
-  and re-pinned `spec_version: "0.3"`.
+- §7.1 states the reservation of the trust-shaped pre-release namespace (closes spec repository issue #13):
+  a pre-release whose first identifier is trust-shaped (`t` + a level digit) is reserved, and a malformed
+  trust identifier (two-digit level, missing or zero iteration, level out of range) is invalid and rejected,
+  never reinterpreted as a plain pre-release. This states in normative text the fail-closed rule the
+  conformance grammar vectors already enforce; the spoofing-surface and single-digit-cap rationale is the
+  ADR-010 context. No change to the trust-suffix grammar itself.
+- §5.2 and §10 step 2 mirror the adoption boundary (spec repository ADR-024): a policy MAY declare one
+  policy-pinned `[policy] adoption_boundary`; a first release then verifies `boundary..TO` in place of
+  `root..TO`. The boundary is disclosed in the release attestation (§8.1 `range.from_is_adoption_boundary`)
+  and pre-boundary history is exempt, contributing no trust level at all — never laundered to T0.
+- §9 documents three optional policy fields the reference implementation already recognizes: `[policy]
+  adoption_boundary` (ADR-024), `[identity.human] gpg_keyring` (armored OpenPGP commit-signer registry),
+  and `[identity] attestation_signers` (the SSHSIG-over-DSSE attestation-signer registry, §4.3, §8.2,
+  ADR-022). All three default to absent; a verifier MAY default trust-material paths from them.
+- No changes to the trust taxonomy, level assignment, aggregation semantics, propagation, decision tables,
+  or the trust-suffix grammar; the additions above state an existing parse reservation, add an optional
+  range anchor, and register optional policy vocabulary. Conformance vectors gained additive classification
+  cases and re-pinned `spec_version: "0.3"`; no vector files change in this pass.
 
 ---
 
