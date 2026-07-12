@@ -46,6 +46,7 @@ DECISION = CONFORMANCE / "decision.json"
 RANGE = CONFORMANCE / "range.json"
 VERSION_ANCESTRY = CONFORMANCE / "version-ancestry.json"
 POLICY_TRANSITION = CONFORMANCE / "policy-transition.json"
+PREDICATE_V02 = CONFORMANCE / "predicate-v0.2.json"
 SIGNATURE = CONFORMANCE / "crypto" / "signature-vectors.json"
 ATTESTATION = CONFORMANCE / "crypto" / "attestations" / "attestation-vectors.json"
 SCHEMAS = ROOT / "schemas"
@@ -58,6 +59,7 @@ VECTOR_FILES = (
     RANGE,
     VERSION_ANCESTRY,
     POLICY_TRANSITION,
+    PREDICATE_V02,
     SIGNATURE,
     ATTESTATION,
 )
@@ -1481,6 +1483,26 @@ def _schema_validates(payload: bytes) -> bool:
     return not list(validator.iter_errors(stmt))
 
 
+def _payload_schema_validates(path: Path) -> bool:
+    try:
+        payload = path.read_bytes()
+    except FileNotFoundError:
+        return False
+    return _schema_validates(payload)
+
+
+def check_predicate_v02_instances(vectors: list[dict]) -> None:
+    check("predicate-v02-group-nonempty", bool(vectors))
+    for vec in vectors:
+        payload = CONFORMANCE / vec["inputs"]["payload"]
+        got = _payload_schema_validates(payload)
+        check(
+            f"predicate-v02-{vec['id']}",
+            got == vec["expected"]["schema_valid"],
+            f"{payload.relative_to(ROOT)} schema_valid={got}",
+        )
+
+
 def check_format_gate() -> None:
     """Standing mutation assertion: a payload whose timestamp is not RFC 3339
     must fail schema validation. Guards both against regression of the format
@@ -1716,6 +1738,7 @@ def main() -> int:
         check_git_interval_commands()
         check_version_ancestry(docs[VERSION_ANCESTRY.name])
         check_policy_transitions(docs[POLICY_TRANSITION.name])
+        check_predicate_v02_instances(docs[PREDICATE_V02.name]["vectors"])
         check_attestations(docs[ATTESTATION.name])
         check_format_gate()
         check_attestation_regeneration()

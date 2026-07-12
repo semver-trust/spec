@@ -6,7 +6,7 @@
 **Related:** ADR-021, ADR-027, ADR-028, ADR-029
 **Decision:** release and review predicate v0.1 are historical formats. They
 remain verifiable under their frozen legacy semantics, but they MUST NOT be
-extended or interpreted as carrying v0.4 continuity, policy-transition, or
+extended or interpreted as carrying v0.5/v0.4 continuity, policy-transition, or
 authenticated version-state claims.
 
 The successor predicate family starts at:
@@ -20,9 +20,21 @@ identity, graph/profile adapters, repository identity profile, verification
 time profile, and the verification instant supplied to the verifier. The
 release successor additionally binds the three v0.4 chain dimensions:
 release interval/source predecessor, active/candidate policy state, and
-authenticated version state. The review successor additionally binds canonical
-actor identities, final-revision approval state, and the source identity and
-target revisions the review covers.
+authenticated version state. Its provenance vector remains rich: per-commit
+authorship and review classes are preserved, not reduced to opaque object
+digests. Its policy state also binds the bootstrap descriptor or predecessor
+identity that selected the active authority.
+
+The review successor additionally binds canonical actor identities,
+final-revision approval state, and the source identity and target revisions the
+review covers. New review emission remains blocked until the qualified-review
+and canonical-actor semantics in spec issue #32 are settled; if that decision
+needs facts v0.2 cannot express, the strict-URI rule requires `review/v0.3`
+rather than reinterpretation.
+
+Version-state identities in release v0.2 carry both a digest and a
+canonicalization profile. New release emission remains blocked until emitters
+and verifiers implement that canonicalization profile consistently.
 
 Successor schemas are closed at their object boundaries except for explicitly
 declared extension maps. Any change that alters validation behavior or
@@ -55,7 +67,7 @@ state is insufficient if the review attestation still cannot say which actor
 was canonical, which revision was approved, and which profile interpreted the
 approval.
 **Rejected:** extend v0.1 with optional fields (closed vendored schemas reject
-them); reinterpret existing v0.1 fields under v0.4 rules (historical bytes gain
+them); reinterpret existing v0.1 fields under v0.5 rules (historical bytes gain
 claims they did not encode); rely on repository policy to supply profile
 identity (the attestation is no longer portable); use one successor URI with
 open-world unknown fields for normative semantics (unknown fields cannot be

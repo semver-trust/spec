@@ -623,7 +623,12 @@ attestations MUST bind explicit specification, predicate, evaluator,
 repository-identity, graph, policy, actor-identity where applicable, and
 verification-time profiles. Successor schemas are closed except for declared
 extension maps; any change that alters validation or interpretation requires a
-new predicate URI and schema.
+new predicate URI and schema. Predicate v0.2 review emission remains blocked
+until qualified-review and canonical-actor semantics are settled (§12); if that
+work needs facts v0.2 cannot express, a new `review/v0.3` predicate is required.
+Version-state identities in `release/v0.2` carry a digest plus a
+canonicalization profile; v0.2 emission is blocked until that profile is
+implemented by emitters and reproducible by verifiers.
 
 Migration from v0.1 establishes a new authenticated v0.5 chain genesis. The
 bootstrap descriptor MAY independently pin a selected legacy `TO` as an included

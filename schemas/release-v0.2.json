@@ -169,7 +169,8 @@
         "candidate_policy",
         "candidate_trust_roots",
         "mandatory_workflows",
-        "authority"
+        "authority",
+        "authority_identity"
       ],
       "additionalProperties": false,
       "properties": {
@@ -189,7 +190,8 @@
           "type": "array",
           "items": { "$ref": "#/$defs/digestDescriptor" }
         },
-        "authority": { "type": "string", "enum": ["bootstrap", "predecessor"] }
+        "authority": { "type": "string", "enum": ["bootstrap", "predecessor"] },
+        "authority_identity": { "$ref": "#/$defs/digestDescriptor" }
       }
     },
     "versionState": {
@@ -214,9 +216,9 @@
           "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/tagIdentity" }]
         },
         "prior_state": {
-          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/objectIdentity" }]
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/stateIdentity" }]
         },
-        "resulting_state": { "$ref": "#/$defs/objectIdentity" },
+        "resulting_state": { "$ref": "#/$defs/stateIdentity" },
         "target_core": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
         "target_bump": { "$ref": "#/$defs/bump" },
         "emission": { "$ref": "#/$defs/tagEmission" },
@@ -243,6 +245,16 @@
         }
       }
     },
+    "stateIdentity": {
+      "type": "object",
+      "required": ["id", "digest", "canonicalization"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "digest": { "$ref": "#/$defs/digestSet" },
+        "canonicalization": { "$ref": "#/$defs/profile" }
+      }
+    },
     "trustLevel": { "type": "string", "enum": ["T0", "T1", "T2", "T3"] },
     "bump": { "type": "string", "enum": ["major", "minor", "patch"] },
     "trustResult": {
@@ -260,7 +272,48 @@
     },
     "provenanceVector": {
       "type": "array",
-      "items": { "$ref": "#/$defs/objectIdentity" }
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/provenanceCommit" }
+    },
+    "provenanceCommit": {
+      "type": "object",
+      "required": ["sha", "level", "authorship", "review"],
+      "additionalProperties": false,
+      "properties": {
+        "sha": { "type": "string", "minLength": 1 },
+        "level": { "$ref": "#/$defs/trustLevel" },
+        "authorship": {
+          "type": "object",
+          "required": ["class"],
+          "additionalProperties": false,
+          "properties": {
+            "class": {
+              "type": "string",
+              "enum": ["human", "agent", "mixed", "ambiguous"]
+            },
+            "actor": { "type": "string", "minLength": 1 },
+            "credential_identity": { "type": "string", "minLength": 1 },
+            "trailers": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            }
+          }
+        },
+        "review": {
+          "type": "object",
+          "required": ["class"],
+          "additionalProperties": false,
+          "properties": {
+            "class": { "type": "string", "enum": ["human", "agent", "none"] },
+            "actor": { "type": "string", "minLength": 1 },
+            "attestation": { "$ref": "#/$defs/objectIdentity" }
+          }
+        },
+        "derivations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/objectIdentity" }
+        }
+      }
     },
     "evidenceVector": {
       "type": "object",
