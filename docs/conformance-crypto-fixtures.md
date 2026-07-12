@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Conformance Cryptographic Fixtures — Design Plan
 
-**Status:** Signed off by the maintainer 2026-07-06 (§7). This document plans the cryptographic conformance
-fixtures; it generates no keys and writes no code. The fixtures themselves are built later, in the Go
-reference implementation's Phase 3 (`GO-030`..`GO-033`). The governing decision is
+**Status:** Signed off by the maintainer 2026-07-06 (§7); the SSH and DSSE
+fixture phases are implemented under `conformance/crypto/`, while the keyless
+phase remains planned. This document records the fixture design. The governing decision is
 [ADR-018](adr/0018-verification-interfaces-accept-injectable-trust-roots-and-clock-from-day-one.md);
 the finding that motivates it is the fixture-aging boundary condition in
 [the steelman analysis §3.2 item 6](analysis/2026-07-04-steelman.md).
@@ -55,7 +55,7 @@ first-class example (§4.2, §9 `allowed_signers`) and the Go toolchain's native
 | `revoked-carol` | Revoked | Enrolled, then invalid at the fixture epoch → the revoked-signer abort case, distinct from unknown. |
 
 `unknown-mallory` and `revoked-carol` are deliberately separate: "signer never enrolled" and "signer enrolled
-but not valid at the verification instant" are different failure modes, and §10.3 aborts on both
+but not valid at the verification instant" are different failure modes, and §10 step 5 aborts on both
 (unverifiable ≠ T0). Keeping them distinct lets the suite prove the verifier distinguishes them. GPG is a
 permitted alternative in §4.2; a parallel GPG key family is deferred (§7 OQ3, resolved) so `GO-031` ships one
 signing format first — **with fail-closed proven, not assumed** (maintainer rider, 2026-07-06): the verifier's
@@ -207,9 +207,9 @@ time**, not stored. The suite must cover the repository shapes that `GO-030`/`GO
 |---|---|---|
 | squash-forbidden | §4.3.3 — squash/rebase merge under a policy that forbids it | verification aborts |
 | merge-with-conflict-hunks | §4.3.4 — merge commit with a non-empty (conflict-resolution) diff | novel hunks classified as authored; review attestation does not auto-cover them |
-| first-release root..TO | §10.2 — `FROM` = root; enumerate `root..TO` | levels assigned across the whole history |
-| unknown-signer abort | §10.3 — commit signed by `unknown-mallory` | abort (unverifiable ≠ T0) |
-| unverifiable-commit abort | §10.3 — invalid signature or missing covering attestation | abort |
+| first-release inception | §5.2 / §10 step 3 — enumerate `git rev-list TO` | every reachable root included; levels assigned across the whole history |
+| unknown-signer abort | §10 step 5 — commit signed by `unknown-mallory` | abort (unverifiable ≠ T0) |
+| unverifiable-commit abort | §10 step 5 — invalid signature or missing covering attestation | abort |
 
 Determinism is the constraint — not polish, but what makes SHA-level expectations possible at all. Scripts pin
 every input a commit SHA depends on: `GIT_AUTHOR_DATE` and `GIT_COMMITTER_DATE` set to the fixture epoch (§3),

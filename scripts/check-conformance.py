@@ -2,15 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 """check-conformance.py — independent validation of the SemVer-Trust conformance vectors.
 
-Validates ``conformance/levels.json``, ``conformance/precedence.json``,
-``conformance/aggregation.json``, ``conformance/propagation.json``, and
-``conformance/decision.json`` against a second, independent implementation of the
-spec rules they encode (``spec/semver-trust.md`` §3.2-§3.3, §4.1-§4.2, §5.1-§5.4,
-§6.1-§6.4, §7.1-§7.2, Appendix A). This is deliberately NOT the reference Go
-implementation, and it shares no code with ``scripts/check-drift.py`` — the SemVer
-comparator, the level invariant, the scope/floor/propagation arithmetic, and the
-decision table are re-implemented here from first principles. Agreement between two
-independent implementations is the point.
+Validates the core, release-range, policy-transition, and cryptographic vector
+files against a second, independent implementation of the spec rules they
+encode (``spec/semver-trust.md`` §3.2-§3.3, §4.1-§4.2, §5.1-§5.4,
+§6.1-§6.4, §7.1-§7.2, §10, Appendix A). This is deliberately NOT the reference
+Go implementation, and it shares no code with ``scripts/check-drift.py`` — the
+SemVer comparator, level invariant, interval reachability, policy-transition
+rules, scope/floor/propagation arithmetic, and decision table are re-implemented
+here from first principles. Agreement between independent implementations is
+the point.
 
     uv run --group dev python3 scripts/check-conformance.py
 
@@ -30,6 +30,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from itertools import pairwise
 from pathlib import Path
 
@@ -42,9 +43,21 @@ PRECEDENCE = CONFORMANCE / "precedence.json"
 AGGREGATION = CONFORMANCE / "aggregation.json"
 PROPAGATION = CONFORMANCE / "propagation.json"
 DECISION = CONFORMANCE / "decision.json"
+RANGE = CONFORMANCE / "range.json"
+POLICY_TRANSITION = CONFORMANCE / "policy-transition.json"
 SIGNATURE = CONFORMANCE / "crypto" / "signature-vectors.json"
 ATTESTATION = CONFORMANCE / "crypto" / "attestations" / "attestation-vectors.json"
-VECTOR_FILES = (LEVELS, PRECEDENCE, AGGREGATION, PROPAGATION, DECISION, SIGNATURE, ATTESTATION)
+VECTOR_FILES = (
+    LEVELS,
+    PRECEDENCE,
+    AGGREGATION,
+    PROPAGATION,
+    DECISION,
+    RANGE,
+    POLICY_TRANSITION,
+    SIGNATURE,
+    ATTESTATION,
+)
 ATTESTATIONS_DIR = ATTESTATION.parent
 SPEC = ROOT / "spec" / "semver-trust.md"
 
@@ -252,6 +265,255 @@ def _reachable(start: str, edges: list[list[str]]) -> set[str]:
                 seen.add(nxt)
                 frontier.append(nxt)
     return seen
+
+
+# §5.2 release intervals over a Git-style parent graph. Commit arrays in the
+# vectors are oldest-first fixtures; the set arithmetic is normative and input
+# order is used only to serialize the expected provenance membership.
+def _commit_reach(start: str, parents: dict[str, list[str]]) -> set[str]:
+    seen: set[str] = set()
+    frontier = [start]
+    while frontier:
+        commit = frontier.pop()
+        if commit in seen:
+            continue
+        seen.add(commit)
+        frontier.extend(parents.get(commit, []))
+    return seen
+
+
+def _release_interval(inputs: dict) -> dict:
+    ordered = [commit["id"] for commit in inputs["commits"]]
+    parents = {commit["id"]: commit["parents"] for commit in inputs["commits"]}
+
+    def fail(reason: str) -> dict:
+        return {"outcome": "verification_failed", "commits": [], "reason": reason}
+
+    if len(parents) != len(ordered) or any(
+        parent not in parents for commit_parents in parents.values() for parent in commit_parents
+    ):
+        return fail("invalid_commit_graph")
+    to = inputs["to"]
+    if to not in parents:
+        return fail("unknown_to")
+    reachable_to = _commit_reach(to, parents)
+    mode = inputs["mode"]
+
+    if mode == "inception":
+        if inputs["existing_chain_heads"] != 0:
+            return fail("predecessor_required")
+        if inputs.get("requested_from") is not None:
+            return fail("untrusted_from")
+        included = reachable_to
+    elif mode == "adoption":
+        if inputs["existing_chain_heads"] != 0:
+            return fail("predecessor_required")
+        if inputs.get("requested_from") is not None:
+            return fail("untrusted_from")
+        boundary = inputs.get("boundary")
+        if boundary is None:
+            return fail("boundary_required")
+        if not boundary["bootstrap_pinned"]:
+            return fail("boundary_not_bootstrap_pinned")
+        if boundary["ref_target"] != boundary["oid"]:
+            return fail("boundary_ref_moved")
+        boundary_oid = boundary["oid"]
+        if boundary_oid not in reachable_to:
+            return fail("boundary_not_reachable")
+        excluded: set[str] = set()
+        for parent in parents[boundary_oid]:
+            excluded |= _commit_reach(parent, parents)
+        included = reachable_to - excluded
+    elif mode == "recurring":
+        predecessor = inputs.get("predecessor")
+        if predecessor is None:
+            return fail("predecessor_missing")
+        if not predecessor["accepted"]:
+            return fail("predecessor_not_accepted")
+        if not predecessor["chain_head"] or inputs["existing_chain_heads"] != 1:
+            return fail("predecessor_not_unique_head")
+        if predecessor["repository"] != inputs["repository"]:
+            return fail("predecessor_repository_mismatch")
+        if predecessor["component"] != inputs["component"]:
+            return fail("predecessor_component_mismatch")
+        previous_to = predecessor["to"]
+        if previous_to not in reachable_to:
+            return fail("predecessor_not_ancestor")
+        if predecessor["tag_target"] != previous_to:
+            return fail("predecessor_ref_moved")
+        if inputs.get("requested_from") != previous_to:
+            return fail("from_not_predecessor")
+        if previous_to == to:
+            return fail("promotion_required")
+        included = reachable_to - _commit_reach(previous_to, parents)
+    else:
+        return fail("unknown_interval_mode")
+
+    return {
+        "outcome": "verified",
+        "commits": [commit for commit in ordered if commit in included],
+        "reason": None,
+    }
+
+
+def _meta_covers(policy: dict, path: str) -> bool:
+    return any(_glob_to_re(pattern).match(path) for pattern in policy["meta_paths"])
+
+
+def _mandatory_meta_covered(policy: dict) -> bool:
+    mandatory = [policy["path"], *policy["trust_material"]]
+    return all(_meta_covers(policy, path) for path in mandatory)
+
+
+def _trust_roles_valid(state: dict) -> bool:
+    role_paths = list(state["trust_roles"].values())
+    material_paths = set(state["trust_material"])
+    return bool(role_paths) and set(role_paths) == material_paths
+
+
+def _verification_time_valid(value: object) -> bool:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        return False
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        return False
+    return parsed.utcoffset() is not None and parsed.utcoffset().total_seconds() == 0
+
+
+# §5.4 / ADR-028: bootstrap or predecessor state selects the active policy;
+# candidate state never authorizes its own transition and activates only after
+# the release succeeds.
+def _policy_transition(doc: dict, inputs: dict) -> dict:
+    policies = doc["policies"]
+    active = policies[inputs["active_policy"]]
+    candidate = policies[inputs["candidate_policy"]]
+
+    def fail(reason: str) -> dict:
+        return {
+            "outcome": "verification_failed",
+            "reason": reason,
+            "evaluated_policy": active["digest"],
+            "activated_policy": None,
+        }
+
+    if not _trust_roles_valid(active):
+        return fail("active_trust_roles_invalid")
+    if not _trust_roles_valid(candidate):
+        return fail("candidate_trust_roles_invalid")
+
+    if inputs["authority"] == "bootstrap":
+        bootstrap_ref = inputs.get("bootstrap")
+        if bootstrap_ref is None:
+            return fail("bootstrap_missing")
+        bootstrap = doc["bootstraps"][bootstrap_ref]
+        if not bootstrap["authenticated"]:
+            return fail("bootstrap_unauthenticated")
+        if (
+            bootstrap["repository"] != inputs["repository"]
+            or bootstrap["component"] != inputs["component"]
+        ):
+            return fail("bootstrap_subject_mismatch")
+        if bootstrap["range_mode"] != inputs["range_mode"]:
+            return fail("bootstrap_range_mode_mismatch")
+        if bootstrap["boundary"] != inputs["boundary"]:
+            return fail("bootstrap_boundary_mismatch")
+        if bootstrap["verification_profile"] != inputs["verification_profile"]:
+            return fail("bootstrap_profile_mismatch")
+        if bootstrap["clock_profile"] != inputs["clock_profile"]:
+            return fail("bootstrap_clock_profile_mismatch")
+        if (
+            bootstrap["policy_path"] != active["path"]
+            or bootstrap["policy_digest"] != active["digest"]
+        ):
+            return fail("bootstrap_policy_mismatch")
+        if bootstrap["trust_material"] != active["trust_material"]:
+            return fail("bootstrap_trust_material_mismatch")
+        if bootstrap["trust_roles"] != active["trust_roles"]:
+            return fail("bootstrap_trust_roles_mismatch")
+        mandatory_meta_paths = bootstrap["mandatory_meta_paths"]
+        if (
+            candidate["path"] != active["path"]
+            or candidate["digest"] != active["digest"]
+            or candidate["trust_material"] != active["trust_material"]
+            or candidate["trust_roles"] != active["trust_roles"]
+        ):
+            return fail("bootstrap_candidate_mismatch")
+    elif inputs["authority"] == "predecessor":
+        predecessor_ref = inputs.get("predecessor")
+        if predecessor_ref is None:
+            return fail("predecessor_missing")
+        predecessor = doc["predecessors"][predecessor_ref]
+        if not predecessor["accepted"]:
+            return fail("predecessor_not_accepted")
+        if not predecessor["chain_head"]:
+            return fail("predecessor_not_chain_head")
+        if (
+            predecessor["repository"] != inputs["repository"]
+            or predecessor["component"] != inputs["component"]
+        ):
+            return fail("predecessor_subject_mismatch")
+        if predecessor["verification_profile"] != inputs["verification_profile"]:
+            return fail("predecessor_profile_mismatch")
+        if predecessor["clock_profile"] != inputs["clock_profile"]:
+            return fail("predecessor_clock_profile_mismatch")
+        if (
+            predecessor["policy_path"] != active["path"]
+            or predecessor["policy_digest"] != active["digest"]
+            or predecessor["trust_material"] != active["trust_material"]
+        ):
+            return fail("predecessor_policy_mismatch")
+        if predecessor["trust_roles"] != active["trust_roles"]:
+            return fail("predecessor_trust_roles_mismatch")
+        mandatory_meta_paths = predecessor["mandatory_meta_paths"]
+    else:
+        return fail("unknown_policy_authority")
+
+    if not _verification_time_valid(inputs.get("verification_time")):
+        return fail("verification_time_missing_or_invalid")
+    if not all(_meta_covers(active, path) for path in mandatory_meta_paths):
+        return fail("active_authority_meta_uncovered")
+    if not all(_meta_covers(candidate, path) for path in mandatory_meta_paths):
+        return fail("candidate_authority_meta_uncovered")
+    if not _mandatory_meta_covered(active):
+        return fail("active_mandatory_meta_uncovered")
+    if inputs["provided_trust_material"] != active["trust_material"]:
+        return fail("trust_material_mismatch")
+    if candidate["path"] != active["path"]:
+        return fail("candidate_policy_path_changed")
+    if LEVEL_RANK[candidate["required_level"]] < LEVEL_RANK[active["required_level"]]:
+        return fail("candidate_meta_level_lowered")
+    if (
+        candidate["adoption_boundary"] is not None
+        and candidate["adoption_boundary"] != inputs["boundary"]
+    ):
+        return fail("adoption_boundary_changed")
+    if not _mandatory_meta_covered(candidate):
+        return fail("candidate_mandatory_meta_uncovered")
+
+    active_signers = set(active["authorized_signers"])
+    for commit in inputs["commits"]:
+        if commit["signer"] not in active_signers:
+            return fail("unknown_active_signer")
+
+    meta_patterns = [*active["meta_paths"], *candidate["meta_paths"]]
+    meta_patterns += mandatory_meta_paths
+    meta_patterns += [active["path"], candidate["path"]]
+    meta_patterns += list(active["trust_material"])
+    meta_patterns += list(candidate["trust_material"])
+    compiled = [_glob_to_re(pattern) for pattern in meta_patterns]
+    required = LEVEL_RANK[active["required_level"]]
+    for commit in inputs["commits"]:
+        touches_meta = any(rx.match(path) for path in commit["paths"] for rx in compiled)
+        if touches_meta and LEVEL_RANK[commit["level"]] < required:
+            return fail("under_level_meta_commit")
+
+    return {
+        "outcome": "verified",
+        "reason": None,
+        "evaluated_policy": active["digest"],
+        "activated_policy": candidate["digest"],
+    }
 
 
 # §6.4 default decision table. Cell values: the clean channel is available
@@ -540,6 +802,121 @@ def check_decision(vectors: list[dict]) -> None:
     }
     missing = [f"{t}/{b}" for t, b in _TABLE if (t, b) not in demote_cells]
     check("decision-table-exhaustive", not missing, f"uncovered §6.4 cells: {missing}")
+
+
+def check_ranges(vectors: list[dict]) -> None:
+    ranges = [vector for vector in vectors if vector.get("kind") == "release_range"]
+    check("range-group-nonempty", bool(ranges))
+    modes = set()
+    for vector in ranges:
+        modes.add(vector["inputs"]["mode"])
+        got = _release_interval(vector["inputs"])
+        check(
+            f"range-{vector['id']}",
+            got == vector["expected"],
+            f"release interval mismatch: computed {got}, vector says {vector['expected']}",
+        )
+    missing = {"inception", "adoption", "recurring"} - modes
+    check("range-modes-exhaustive", not missing, f"missing interval modes: {sorted(missing)}")
+
+
+def check_git_interval_commands() -> None:
+    """Prove the §5.2 set definitions match the specified Git commands,
+    including a merge boundary with two parents and a root boundary."""
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp) / "repo"
+
+        def git(*args: str) -> str:
+            result = subprocess.run(
+                ["git", "-C", str(repo), *args],
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+            return result.stdout.strip()
+
+        def commit(message: str) -> str:
+            git("commit", "--allow-empty", "--no-gpg-sign", "-m", message)
+            return git("rev-parse", "HEAD")
+
+        try:
+            subprocess.run(
+                ["git", "init", "-q", "-b", "main", str(repo)],
+                capture_output=True,
+                check=True,
+            )
+            git("config", "user.name", "Conformance Fixture")
+            git("config", "user.email", "fixture@semver-trust.test")
+            git("config", "commit.gpgSign", "false")
+
+            root = commit("root")
+            left = commit("left parent")
+            git("switch", "-q", "-c", "side", root)
+            side = commit("side parent")
+            git("switch", "-q", "main")
+            git("merge", "--no-ff", "--no-gpg-sign", "-m", "boundary", "side")
+            boundary = git("rev-parse", "HEAD")
+            after = commit("after boundary")
+
+            def revs(*args: str) -> set[str]:
+                output = git("rev-list", *args)
+                return set(output.split()) if output else set()
+
+            inception = revs(after)
+            adoption = revs(after, "--not", f"{boundary}^@")
+            recurring = revs(f"{boundary}..{after}")
+            root_adoption = revs(after, "--not", f"{root}^@")
+            expected_all = {root, left, side, boundary, after}
+
+            check(
+                "range-git-inception-command",
+                inception == expected_all,
+                f"git rev-list TO produced {sorted(inception)}",
+            )
+            check(
+                "range-git-adoption-command",
+                adoption == {boundary, after},
+                f"git rev-list TO --not B^@ produced {sorted(adoption)}",
+            )
+            check(
+                "range-git-recurring-command",
+                recurring == {after},
+                f"git rev-list P..TO produced {sorted(recurring)}",
+            )
+            check(
+                "range-git-root-boundary-command",
+                root_adoption == expected_all,
+                f"root B^@ handling produced {sorted(root_adoption)}",
+            )
+        except subprocess.CalledProcessError as exc:
+            check(
+                "range-git-command-fixture",
+                False,
+                exc.stderr.strip() if isinstance(exc.stderr, str) else str(exc),
+            )
+
+
+def check_policy_transitions(doc: dict) -> None:
+    vectors = [
+        vector for vector in doc.get("vectors", []) if vector.get("kind") == "policy_transition"
+    ]
+    check("policy-transition-group-nonempty", bool(vectors))
+    authorities = set()
+    for vector in vectors:
+        authorities.add(vector["inputs"]["authority"])
+        got = _policy_transition(doc, vector["inputs"])
+        check(
+            f"policy-transition-{vector['id']}",
+            got == vector["expected"],
+            f"policy transition mismatch: computed {got}, vector says {vector['expected']}",
+        )
+    missing = {"bootstrap", "predecessor"} - authorities
+    check(
+        "policy-transition-authorities-exhaustive",
+        not missing,
+        f"missing authorities: {sorted(missing)}",
+    )
 
 
 # ---- Attestation envelope checks (fixture plan §6) --------------------------
@@ -868,6 +1245,9 @@ def main() -> int:
         check_aggregation(docs[AGGREGATION.name]["vectors"])
         check_propagation(docs[PROPAGATION.name]["vectors"])
         check_decision(docs[DECISION.name]["vectors"])
+        check_ranges(docs[RANGE.name]["vectors"])
+        check_git_interval_commands()
+        check_policy_transitions(docs[POLICY_TRANSITION.name])
         check_attestations(docs[ATTESTATION.name])
         check_format_gate()
         check_attestation_regeneration()

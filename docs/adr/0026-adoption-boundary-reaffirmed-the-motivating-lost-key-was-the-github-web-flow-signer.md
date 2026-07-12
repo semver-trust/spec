@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # ADR-026 — Adoption boundary reaffirmed: the motivating lost key was the GitHub web-flow signer
 
-**Status:** Accepted (2026-07-12)
+**Status:** Superseded by ADR-027 (2026-07-12)
 **Date:** 2026-07-12
 **Supersedes:** ADR-024
 **Decision:** the adoption-boundary mechanism is reaffirmed **unchanged**: a repository MAY declare a single
