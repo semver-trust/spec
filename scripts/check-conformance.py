@@ -169,12 +169,10 @@ def _scopes_of(path: str, compiled: list[tuple[re.Pattern, str]]) -> set[str]:
     return touched or {"default"}  # §5.1: unmatched paths fall to the implicit default scope
 
 
-# Per-path contributed level, after §4.4: a verified derivation re-levels exactly
-# its declared output paths to the inputs' floor; a failed proof is void.
+# Per-path contributed level after §4.4: the portable baseline does not define
+# executable derivation proofs, so derivation metadata never re-levels paths.
 def _path_level(commit: dict, path: str) -> str:
-    deriv = commit.get("derivation")
-    if deriv and deriv["verified"] and any(_glob_to_re(g).match(path) for g in deriv["outputs"]):
-        return deriv["inherited_level"]
+    _ = path
     return commit["level"]
 
 
@@ -190,8 +188,8 @@ def _partition(scopes: dict[str, str], commits: list[dict]) -> dict[str, list[st
     return result
 
 
-# §5.2: own_trust(scope) = min over commits touching the scope of level(c),
-# levels taken per path after derivation re-leveling (§4.4).
+# §5.2: own_trust(scope) = min over commits touching the scope of level(c).
+# Unsupported derivation claims do not elevate path levels (§4.4).
 def _floors(scopes: dict[str, str], commits: list[dict]) -> dict[str, str]:
     compiled = [(_glob_to_re(g), name) for g, name in scopes.items()]
     floors: dict[str, int] = {}

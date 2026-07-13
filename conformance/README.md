@@ -8,14 +8,15 @@ reference implementation treats them as acceptance tests, and any other implemen
 passing them.
 
 The Go reference implementation currently implements the draft v0.3 vector
-set. The v0.4–v0.7 range, policy-transition, version-ancestry, successor
-predicate, qualified-review, and threshold-decision groups in this revision are
-the source contract for its next coordinated, digest-pinned update.
+set. The v0.4–v0.8 range, policy-transition, version-ancestry, successor
+predicate, qualified-review, threshold-decision, and derivation-fail-closed
+groups in this revision are the source contract for its next coordinated,
+digest-pinned update.
 
 Each vector is derived directly from a normative section of the spec and carries a `spec` back-reference to
 it. The vectors in this directory cover **level assignment** (§3.2, §3.3, §4.1–§4.2), **version precedence
 and tag grammar** (§7.1, §7.2), **aggregation** (§5.1–§5.2 scope partitioning and floors, §5.4 meta-paths,
-with §4.4 derivation re-leveling as it feeds §5.2), **transitive propagation** (§5.3, including SCC
+with §4.4 derivation claims ignored for portable re-leveling), **transitive propagation** (§5.3, including SCC
 collapse), **release intervals and predecessor continuity** (§5.2), **policy transitions** (§5.4),
 **authenticated version ancestry** (§7.5), **qualified review** (§4.3), and **release decisions** (§6.1–§6.4
 with §7.1 encoding). Every step of the spec's Appendix A worked example is reproduced as a vector (ids
@@ -49,21 +50,21 @@ against these vectors.
 
 ## `spec_version` pinning
 
-Every vector file carries a top-level `spec_version` (currently `"0.7"`). It names the spec draft the vectors
+Every vector file carries a top-level `spec_version` (currently `"0.8"`). It names the spec draft the vectors
 encode, not the version of the vector set. The rules:
 
-- The vectors track the pinned spec draft. When they say `"0.7"`, their expectations are those of
-  `spec/semver-trust.md` **Draft v0.7**.
+- The vectors track the pinned spec draft. When they say `"0.8"`, their expectations are those of
+  `spec/semver-trust.md` **Draft v0.8**.
 - All vector files in this directory MUST share the same `spec_version`; the validator enforces this and
   cross-checks it against the spec's draft header.
-- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.7 level and
+- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.8 level and
   precedence vectors" is the precise claim.
 
 The frozen v0.1 DSSE fixtures retain their v0.1 predicate bytes while their
-vector envelope is pinned to spec draft 0.7. Passing those vectors proves
+vector envelope is pinned to spec draft 0.8. Passing those vectors proves
 **backward verification** of historical v0.1 attestations only. It does not make
-v0.1 sufficient for a v0.7 release-conformance claim; §8.1 requires the v0.2
-successor predicate before v0.7 release emission.
+v0.1 sufficient for a v0.8 release-conformance claim; §8.1 requires the v0.2
+successor predicate before v0.8 release emission.
 
 The range, policy-transition, and version-ancestry files isolate independent
 dimensions for precise failures. Their authority fixtures are projections, not
@@ -80,7 +81,7 @@ Every vector file shares an envelope:
 ```json
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.7",
+  "spec_version": "0.8",
   "description": "…what this file covers…",
   "vectors": [ /* … */ ]
 }
@@ -175,15 +176,14 @@ Diff-path lists mapped through a policy scope-glob map (§5.1). Globs are gitign
 ### `aggregation.json` — kind: `scope_floor`
 
 Same inputs plus per-commit levels; asserts the §5.2 per-scope floor. A commit MAY carry a `derivation`
-object modeling §4.4 as it feeds aggregation: when `verified` is true, paths matching `outputs` contribute
-`inherited_level` (the derivation inputs' floor, computed upstream and carried here as data); all other
-paths — and every path when `verified` is false — contribute the commit's raw `level`.
+object as non-authoritative metadata or an adversarial fixture. Under the draft v0.8 portable baseline,
+derivation metadata never raises path trust: every changed path contributes the commit's raw `level`.
 
 | Field | Type | Meaning |
 |---|---|---|
 | `inputs.scopes` | object | Policy scope map, as above. |
 | `inputs.commits[]` | array | Each has `id`, `level` (`T0`–`T3`), `paths`, and optionally `derivation`. |
-| `inputs.commits[].derivation` | object | `{ "outputs": [globs], "verified": bool, "inherited_level": "T0"–"T3" }`. |
+| `inputs.commits[].derivation` | object | Non-authoritative metadata; implementations MUST ignore it for portable trust re-leveling. |
 | `expected.own_trust` | object | Scope name → floored own trust (`T0`–`T3`) for every touched scope. |
 
 ### `aggregation.json` — kind: `meta_path`
@@ -361,7 +361,7 @@ false (§1.1 honest degradation).
   the extracted `component_path`, `core`, `level`, `iteration`, and `prerelease` match.
 - **`scope_partition`** — partition `inputs.commits` by diff paths through `inputs.scopes`; assert the
   scope → commits map equals `expected.scopes`.
-- **`scope_floor`** — compute the per-scope own-trust floor (applying any `derivation` re-leveling first);
+- **`scope_floor`** — compute the per-scope own-trust floor (ignoring any `derivation` metadata for re-leveling);
   assert it equals `expected.own_trust`.
 - **`meta_path`** — evaluate the §5.4 rule over `inputs.commits` against `inputs.meta`; assert
   `expected.outcome` and `expected.violations`. `verification_failed` means the whole range fails — an

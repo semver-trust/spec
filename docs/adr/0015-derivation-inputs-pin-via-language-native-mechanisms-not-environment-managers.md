@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # ADR-015 — Derivation inputs pin via language-native mechanisms, not environment managers
 
-**Status:** Accepted (2026-07-04)
+**Status:** Superseded by ADR-033 (2026-07-13)
 **Date:** 2026-07-04
 **Decision:** derivation rules (spec §4.4) pin their toolchain via **self-contained, language-native mechanisms** — module/tool manifests with checksum verification (e.g. `tools/go.mod` + `go.sum` using Go's `tool` directive, `Cargo.lock`, uv lockfiles) or container image digests — never via developer-environment manager state (`devbox.lock`, `mise.toml`, or equivalents). Re-running a derivation for verification must require only the language toolchain and the pinned inputs, not the maintainer's environment tooling. To be mirrored into spec §4.4 as normative SHOULD-level language in the batched v0.2 pass.
 **Rationale:** spec §4.4 currently permits "lockfile, checksum, or vendored binary" without constraining *which* lockfile; an environment manager's lockfile technically qualifies, but it couples attestation verification to that manager's presence on every third-party verifier's machine (e.g. a Nix daemon to honor `devbox.lock`). Verification portability is the P5 principle extended one step: portable attestations imply portable *verification*. The rule also decouples the developer-environment choice (ADR-016) from scheme correctness, converting it from a load-bearing decision into a reversible DX preference. Language-native pins additionally get checksum verification (e.g. Go module sumdb) for free.
