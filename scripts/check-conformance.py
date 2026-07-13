@@ -3,14 +3,15 @@
 """check-conformance.py — independent validation of the SemVer-Trust conformance vectors.
 
 Validates the core, release-range, policy-transition, version-ancestry, qualified-review,
-source-evidence, and cryptographic vector files against a second, independent implementation
-of the spec rules they encode (``spec/semver-trust.md`` §3.2-§3.3, §4.1-§4.2,
+publishing-profile, source-evidence, and cryptographic vector files against a second,
+independent implementation of the spec rules they encode (``spec/semver-trust.md``
+§3.2-§3.3, §4.1-§4.2,
 §5.1-§5.4, §6.1-§6.4, §7.1-§7.5, §10, Appendix A). This is deliberately NOT the reference
 Go implementation, and it shares no code with ``scripts/check-drift.py`` — the
-SemVer comparator, level invariant, interval reachability, policy-transition, version-ancestry,
-qualified-review, and source-evidence rules, scope/floor/propagation arithmetic, and decision
-table are re-implemented here from first principles. Agreement between independent implementations
-is the point.
+SemVer comparator, level invariant, interval reachability, policy-transition,
+version-ancestry, qualified-review, publishing-profile, and source-evidence rules,
+scope/floor/propagation arithmetic, and decision table are re-implemented here from
+first principles. Agreement between independent implementations is the point.
 
     uv run --group dev python3 scripts/check-conformance.py
 
@@ -47,6 +48,7 @@ RANGE = CONFORMANCE / "range.json"
 VERSION_ANCESTRY = CONFORMANCE / "version-ancestry.json"
 POLICY_TRANSITION = CONFORMANCE / "policy-transition.json"
 REVIEW_QUALIFICATION = CONFORMANCE / "review-qualification.json"
+PUBLISHING_PROFILE = CONFORMANCE / "publishing-profile.json"
 SOURCE_EVIDENCE = CONFORMANCE / "source-evidence.json"
 PREDICATE_V02 = CONFORMANCE / "predicate-v0.2.json"
 SIGNATURE = CONFORMANCE / "crypto" / "signature-vectors.json"
@@ -62,6 +64,7 @@ VECTOR_FILES = (
     VERSION_ANCESTRY,
     POLICY_TRANSITION,
     REVIEW_QUALIFICATION,
+    PUBLISHING_PROFILE,
     SOURCE_EVIDENCE,
     PREDICATE_V02,
     SIGNATURE,
@@ -1469,6 +1472,107 @@ def check_review_qualification(vectors: list[dict]) -> None:
     )
 
 
+def _trust_prerelease(version: str) -> bool:
+    return bool(re.search(r"(?:^|-)t[0-3]\.[1-9][0-9]*(?:$|\+)", version))
+
+
+def _has_release_version(versions: list[str]) -> bool:
+    return any(_SEMVER.match(version) and "-" not in version for version in versions)
+
+
+def _pypi_rc_projection(tag: str) -> str | None:
+    m = _TRUST_TAG.match(tag)
+    if not m or m["level"] is None:
+        return None
+    return f"{m['core']}rc{m['iter']}"
+
+
+def _publishing_profile_result(inputs: dict) -> tuple[bool, str | None]:
+    claim = inputs["claim"]
+    ecosystem = inputs["ecosystem"]
+    versions = inputs.get("registry_versions", [])
+
+    if claim == "registry_routing_establishes_trust":
+        if not inputs.get("attestation_verified", False):
+            return False, "registry_not_authority"
+        return True, None
+
+    if claim == "same_source_promotion":
+        if inputs["source_revision"] != inputs["promoted_source_revision"]:
+            return False, "source_identity_mismatch"
+        return True, None
+
+    if claim == "same_source_promotion_proves_artifact_equality":
+        if inputs["source_revision"] != inputs["promoted_source_revision"]:
+            return False, "source_identity_mismatch"
+        if inputs.get("reproducible_build_profile") is None:
+            return False, "artifact_equality_unproven"
+        if inputs["artifact_digest"] != inputs["promoted_artifact_digest"]:
+            return False, "artifact_digest_mismatch"
+        return True, None
+
+    if ecosystem == "go" and claim == "default_query_hides_trust_prerelease":
+        has_trust_prerelease = any(_trust_prerelease(version) for version in versions)
+        if has_trust_prerelease and not _has_release_version(versions):
+            return False, "go_latest_prerelease_fallback"
+        return True, None
+
+    if ecosystem == "npm" and claim == "ordinary_install_avoids_trust_prerelease":
+        latest = inputs.get("dist_tags", {}).get("latest")
+        if (
+            latest
+            and _trust_prerelease(latest)
+            and not inputs.get("ordinary_install_intended", False)
+        ):
+            return False, "npm_latest_trust_prerelease"
+        return True, None
+
+    if ecosystem == "cargo" and claim == "default_dependency_avoids_trust_prerelease":
+        return True, None
+
+    if ecosystem == "pypi" and claim == "publish_trust_prerelease_projection":
+        projections: dict[str, str] = {}
+        for tag in inputs.get("projected_from", []):
+            projected = _pypi_rc_projection(tag)
+            if projected is None:
+                continue
+            prior = projections.setdefault(projected, tag)
+            if prior != tag:
+                return False, "non_injective_projection"
+        return False, "pypi_projection_deferred"
+
+    return False, "unsupported_profile_claim"
+
+
+def check_publishing_profiles(vectors: list[dict]) -> None:
+    check("publishing-profile-group-nonempty", bool(vectors))
+    expected_reasons = {
+        "go_latest_prerelease_fallback",
+        "npm_latest_trust_prerelease",
+        "pypi_projection_deferred",
+        "non_injective_projection",
+        "registry_not_authority",
+        "artifact_equality_unproven",
+    }
+    seen_reasons = set()
+    for vector in vectors:
+        accepted, reason = _publishing_profile_result(vector["inputs"])
+        expected = vector["expected"]
+        if reason:
+            seen_reasons.add(reason)
+        check(
+            f"publishing-profile-{vector['id']}",
+            accepted == expected["accepted"] and reason == expected["reason"],
+            f"computed accepted={accepted} reason={reason}, vector says {expected}",
+        )
+    missing_reasons = expected_reasons - seen_reasons
+    check(
+        "publishing-profile-negative-coverage",
+        not missing_reasons,
+        f"missing publishing-profile negative reasons: {sorted(missing_reasons)}",
+    )
+
+
 def _source_evidence_result(inputs: dict) -> tuple[bool, str | None]:
     evidence = inputs["evidence"]
     if not evidence:
@@ -1991,6 +2095,7 @@ def main() -> int:
         check_version_ancestry(docs[VERSION_ANCESTRY.name])
         check_policy_transitions(docs[POLICY_TRANSITION.name])
         check_review_qualification(docs[REVIEW_QUALIFICATION.name]["vectors"])
+        check_publishing_profiles(docs[PUBLISHING_PROFILE.name]["vectors"])
         check_source_evidence(docs[SOURCE_EVIDENCE.name]["vectors"])
         check_predicate_v02_instances(docs[PREDICATE_V02.name]["vectors"])
         check_attestations(docs[ATTESTATION.name])

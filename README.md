@@ -50,17 +50,18 @@ The specification is a **v0.10 working draft**. The official Go
 implementation ([semver-trust-go](https://github.com/semver-trust/semver-trust-go))
 passes the draft v0.3 conformance suite and releases itself under the scheme
 (v0.1.0 and v0.2.0 are published, verified, reproducible dogfood). The legacy
-release path is not suitable for production claims until the v0.10 successor
-predicate, publishing-profile, and source-evidence behavior is implemented and covered by coordinated conformance
-fixtures. Draft v0.4 added release-interval, policy-transition, and
+release path is not suitable for production claims until it consumes the v0.10
+successor-predicate, publishing-profile, and source-evidence conformance
+contract. Draft v0.4 added release-interval, policy-transition, and
 authenticated version-ancestry vectors; draft v0.5 assigns successor
 release/review predicate types and schemas for the compatibility-critical state
 bindings; draft v0.6 adds qualified-review and canonical-actor conformance;
 draft v0.7 makes threshold a hard clean-channel accountability gate and
 separates accountability from blast/risk policy; draft v0.8 removes executable
 derivation proofs from the portable baseline; draft v0.9 narrows resolver
-routing claims and defines ecosystem publishing profiles; draft v0.10 defines
-SLSA Source-style source-evidence profiles.
+routing claims and defines ecosystem publishing profiles, now covered by
+adversarial publishing-profile vectors; draft v0.10 defines SLSA Source-style
+source-evidence profiles.
 Design discussion happens in [issues](https://github.com/semver-trust/spec/issues) — see
 [CONTRIBUTING](CONTRIBUTING.md) before opening a pull request.
 

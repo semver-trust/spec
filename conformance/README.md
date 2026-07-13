@@ -9,11 +9,9 @@ passing them.
 
 The Go reference implementation currently implements the draft v0.3 vector
 set. The v0.4–v0.10 range, policy-transition, version-ancestry, successor
-predicate, qualified-review, threshold-decision, and derivation-fail-closed
-groups in this revision are the source contract for its next coordinated,
-digest-pinned update. Draft v0.9 also documents ecosystem publishing profiles;
-adversarial registry-projection vectors remain future coverage. Draft v0.10
-adds source-evidence profile vectors for SLSA Source-style evidence binding.
+predicate, qualified-review, threshold-decision, derivation-fail-closed,
+publishing-profile, and source-evidence groups in this revision are the source
+contract for its next coordinated, digest-pinned update.
 
 Each vector is derived directly from a normative section of the spec and carries a `spec` back-reference to
 it. The vectors in this directory cover **level assignment** (§3.2, §3.3, §4.1–§4.2), **version precedence
@@ -21,7 +19,8 @@ and tag grammar** (§7.1, §7.2), **aggregation** (§5.1–§5.2 scope partition
 with §4.4 derivation claims ignored for portable re-leveling), **transitive propagation** (§5.3, including SCC
 collapse), **release intervals and predecessor continuity** (§5.2), **policy transitions** (§5.4),
 **authenticated version ancestry** (§7.5), **qualified review** (§4.3), **release decisions** (§6.1–§6.4
-with §7.1 encoding), and **source evidence profiles** (§8.3). Every step of the spec's Appendix A worked
+with §7.1 encoding), **ecosystem publishing profiles** (§7.4), and **source
+evidence profiles** (§8.3). Every step of the spec's Appendix A worked
 example is reproduced as a vector (ids containing `appendix-a`).
 Cryptographic verification fixtures —
 vendored test keys, the allowed-signers registry, deterministically built fixture repositories, and SSH
@@ -41,6 +40,7 @@ capability limitation (SSH-only, with fail-closed behavior on other key families
 | `version-ancestry.json` | Genesis/recurring/superseding version-state and exact-tag vectors | Apache 2.0 |
 | `policy-transition.json` | Bootstrap, previous-policy, meta-path, and delayed-activation vectors | Apache 2.0 |
 | `review-qualification.json` | Qualified-review, canonical-actor, final-revision, and agent-independence vectors | Apache 2.0 |
+| `publishing-profile.json` | Ecosystem publishing-profile and registry-projection vectors | Apache 2.0 |
 | `source-evidence.json` | Source-evidence profile binding vectors for SLSA Source-style evidence | Apache 2.0 |
 | `crypto/` | Cryptographic fixtures: vendored test keys, allowed-signers registry, deterministic fixture-repo builder, SSH signature vectors (see `crypto/README.md`) | Apache 2.0 |
 | `check-conformance.py` (in `../scripts/`) | Independent validator for these files (self-check, not the harness) | Apache 2.0 |
@@ -99,7 +99,7 @@ Every vector, regardless of file, has these common fields:
 | Field | Type | Meaning |
 |---|---|---|
 | `id` | string | Stable, unique identifier, e.g. `levels/matrix/agent-none`. Never reused or repurposed. |
-| `kind` | string | Selects the consumption rule: `matrix`, `classify`, `precedence`, `grammar`, `scope_partition`, `scope_floor`, `meta_path`, `propagation`, `release_range`, `version_ancestry`, `policy_transition`, `review_qualification`, or `decision`. |
+| `kind` | string | Selects the consumption rule: `matrix`, `classify`, `precedence`, `grammar`, `scope_partition`, `scope_floor`, `meta_path`, `propagation`, `release_range`, `version_ancestry`, `policy_transition`, `review_qualification`, `publishing_profile`, or `decision`; some file-selected suites use their own specialized discriminator. |
 | `description` | string | Human-readable intent; editorial, not asserted. |
 | `spec` | string | Back-reference to the governing spec section, e.g. `§3.2`. Never empty. |
 
@@ -327,12 +327,30 @@ commit receives.
 | `expected.level` | string | Resulting level under §3.2. |
 | `expected.reason` | string or null | Stable non-qualification category, or null when the review qualifies. |
 
+### `publishing-profile.json` — kind: `publishing_profile`
+
+Ecosystem publishing-profile vectors for §7.4. These use raw registry,
+resolver, projection, and promotion facts to test the claims ADR-034 allows or
+rejects. They do not treat registry state as trust authority; trust still comes
+from accepted release attestations.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `inputs.ecosystem` | string | Ecosystem profile being evaluated: `go`, `npm`, `cargo`, or `pypi`. |
+| `inputs.claim` | string | Registry-routing or promotion claim under test. |
+| `inputs.registry_versions` | array | Versions visible in the registry or module index for the scenario. |
+| `inputs.dist_tags` | object | npm dist-tag state when the npm profile is under test. |
+| `inputs.projected_from` | array | Canonical SemVer-Trust tags projected into an ecosystem version. |
+| `inputs.attestation_verified` | bool | Whether an accepted release attestation is present for the trust claim. |
+| `expected.accepted` | bool | Whether the publishing-profile claim is allowed. |
+| `expected.reason` | string or null | Stable failure category, or null when accepted. |
+
 ### `source-evidence.json`
 
 Profile-level source evidence binding vectors for §8.3. These are deliberately
-not full raw source-control transcripts; #29 tracks broader adversarial
-end-to-end coverage. They assert stable acceptance/failure categories for
-SLSA Source-style evidence before such evidence can feed a release decision.
+not full raw source-control transcripts. They assert stable acceptance/failure
+categories for SLSA Source-style evidence before such evidence can feed a
+release decision.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -403,6 +421,10 @@ false (§1.1 honest degradation).
 - **`policy_transition`** — select active policy from bootstrap/predecessor,
   enforce active identities plus union meta paths, validate candidate
   invariants, and assert evaluated/activated policy digests and failure reason.
+- **`publishing_profile`** — validate ecosystem publishing-profile claims:
+  Go prerelease fallback, npm latest/dist-tag behavior, Cargo prerelease opt-in,
+  deferred/non-injective PyPI projection, registry-not-authority, and
+  same-source promotion artifact claims.
 - **`source-evidence`** — validate source-evidence profile binding: issuer
   authorization, repository/resource matching, subject matching, digest
   algorithm policy, replay vs trusted-issuer mode, freshness, hidden demotion,
