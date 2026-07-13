@@ -12,7 +12,7 @@ The home of the SemVer-Trust specification and its supporting artifacts:
 
 | Path | Role | License |
 |---|---|---|
-| `spec/semver-trust.md` | **Normative specification** (draft v0.7) | CC BY 4.0 |
+| `spec/semver-trust.md` | **Normative specification** (draft v0.8) | CC BY 4.0 |
 | `docs/design-record.md` | Design record: rationale, QA record, handoff contract | CC BY 4.0 |
 | `docs/adr/` | Decision records, one file per ADR, indexed at `docs/adr/README.md` | CC BY 4.0 |
 | `release/`, `review/` | Predicate-type definitions | CC BY 4.0 |
@@ -47,7 +47,7 @@ requires Python 3.11+ (`tomllib`) and nothing else.
 2. **Do not re-litigate rejected alternatives** (each ADR's Rejected list)
    absent new evidence or a changed requirement from the maintainer. Known
    temptations: build-metadata encoding (ADR-001), de-minimis exemptions
-   (ADR-004/P3), unverifiable→T0 (ADR-008), inflation-as-only-strategy
+   (ADR-033/P3), unverifiable→T0 (ADR-008), inflation-as-only-strategy
    (ADR-005), CC0 or restrictive licensing (ADR-014).
 3. **Never modify `LICENSE`, `LICENSE-APACHE`, or `TRADEMARK.md`** without
    explicit maintainer instruction in the current session. The license

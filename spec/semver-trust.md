@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # SemVer-Trust: Provenance-Scoped Trust Levels for Semantic Versioning
 
-**Draft v0.7**
+**Draft v0.8**
 **Status:** Design draft for review
 **Date:** 2026-07-13
 **Canonical home:** https://semver-trust.dev · https://github.com/semver-trust/spec
@@ -164,7 +164,7 @@ review.
 
 Review facts live outside git (platform PR approvals), so they MUST be captured into the provenance record at merge time:
 
-1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer canonical actors and their classes (human/agent), credential identities, approval verdicts, approval state, the PR/MR reference, covered revisions, final-revision or final-diff approval binding, repository and merge-context identity, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.7 release-conformance claims.
+1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer canonical actors and their classes (human/agent), credential identities, approval verdicts, approval state, the PR/MR reference, covered revisions, final-revision or final-diff approval binding, repository and merge-context identity, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.8 release-conformance claims.
 2. The attestation MUST be signed by the workflow's workload identity and stored per §8.2.
 3. A review is **qualified** for trust classification only if all of the following hold:
    - the verdict is `approved`;
@@ -177,17 +177,29 @@ Review facts live outside git (platform PR approvals), so they MUST be captured 
 5. **Merge strategies:** squash and rebase merges rewrite authorship and destroy per-commit provenance. Repositories MUST either (a) forbid squash/rebase merges on protected branches, or (b) ensure the merge-time attestation records the pre-rewrite source revisions and provenance plus the deterministic source-control binding from those revisions to the result revision, so the resulting commit can be classified from attested facts. A squash or rebase approval qualifies only when the approved pre-rewrite content is exactly the content that produced the recorded result revision under the source-control profile.
 6. **Merge commits themselves:** a merge commit with a non-empty diff (conflict resolution) introduces authored changes. It MUST be classified like any other commit — the resolver is its author; the review attestation covering the PR does not automatically cover novel conflict-resolution hunks unless the reviewer re-approved after resolution.
 
-### 4.4 Derivation proofs
+### 4.4 Generated outputs and derivation claims
 
-A **derivation rule** (declared in policy, §9) states: *outputs O are deterministically produced from inputs I by pinned command C.* At verification time, the verifier re-runs C on the tree and diffs against the committed outputs.
+The portable baseline does not define executable derivation proofs. A verifier
+MUST NOT execute repository-, policy-, or producer-supplied commands to raise the
+trust level of generated outputs, formatted files, lockfile rewrites, or other
+mechanically produced artifacts. Such paths contribute the trust level of the
+commits that changed them unless a future accepted proof profile defines a
+non-ambient, reproducible, capability-bounded evidence format.
 
-- If the regenerated outputs are byte-identical, the output paths **inherit the minimum trust level of the input paths** (as of the same tree), regardless of who ran the generator. The proof is reproducibility, not identity.
-- The generator toolchain is itself an input: its version MUST be pinned via lockfile, checksum, or vendored binary, and changes to the pin are ordinary commits subject to ordinary trust classification.
-- Toolchain pins SHOULD be self-contained and language-native (module/tool manifests with checksum verification, or container image digests). Environment-manager state (development-environment lockfiles) MUST NOT serve as a derivation input: re-running a derivation for verification requires only the language toolchain and the pinned inputs, never the maintainer's development tooling.
-- If regeneration differs, the outputs are classified by their commits' own provenance — the derivation claim is simply void for that release, and the discrepancy SHOULD be reported.
-- Formatting-only rules are a degenerate derivation (inputs = outputs, command = formatter): if re-formatting yields an identical tree, a commit that only reformats inherits the trust of the content it formatted.
+A derivation claim MAY be recorded as non-authoritative evidence for local
+policy or future proof profiles, but it supplies no portable trust elevation by
+itself. Re-running a command and observing byte-identical outputs is
+fixed-point evidence, not derivation evidence: it does not prove the committed
+outputs came from trusted inputs, that the command read only declared inputs,
+that it was independent of time, environment, or network state, or that the
+toolchain was uncompromised.
 
-Derivation proofs are the scheme's only exception to weakest-link flooring, and they are principled because they are *verified*, not declared. Projects with no derivations simply have no exceptions. Spec-first architectures (OpenAPI, protobuf, schema DSLs) benefit most: a human-reviewed contract extends its trust to everything provably generated from it.
+An attempted derivation elevation that is absent, unsupported, unverifiable, or
+outside an accepted proof profile is not a waiver and not a downgrade to T0; it
+is ignored for re-leveling. Ordinary weakest-link flooring still applies. This
+preserves the no-de-minimis rule (§5.1): generated or formatting-only commits
+are classified by their accountable authorship/review evidence like any other
+commit.
 
 ## 5. Aggregation
 
@@ -199,7 +211,10 @@ For a root commit included by an inception interval, diff paths are computed
 against Git's empty tree. Merge-commit conflict-resolution changes follow
 §4.3.4; adoption does not retroactively assign trust to exempt parent history.
 
-There is no *de minimis* exception: a one-line T0 commit floors its scope exactly like a thousand-line one. Any "trivial commits don't count" rule becomes the hiding place for a payload; the only sanctioned exception is a verified derivation proof (§4.4).
+There is no *de minimis* exception: a one-line T0 commit floors its scope
+exactly like a thousand-line one. Any "trivial commits don't count" rule becomes
+the hiding place for a payload. Generated outputs and formatting-only commits
+are not exempt under the portable baseline (§4.4).
 
 ### 5.2 Own trust (per-scope floor)
 
@@ -243,7 +258,7 @@ For every scope touched by the selected interval:
 
 ```
 own_trust(scope) = min over commits c in range, c touches scope:
-                     level(c)        # per §3.2, after derivation proofs (§4.4)
+                     level(c)        # per §3.2; no portable derivation elevation
 ```
 
 A commit that fails signature verification, or whose required attestations
@@ -278,7 +293,7 @@ effective(C) = min( own_trust(C),
 
 ### 5.4 Meta-paths and policy transitions
 
-The policy file, scope map, derivation rules, identity map, trust material, and
+The policy file, scope map, derivation metadata, identity map, trust material, and
 workflows that generate attestations can reclassify anything. A candidate policy
 at `TO` therefore MUST NOT authorize its own transition.
 
@@ -386,7 +401,7 @@ Determined by the strongest available compatibility evidence, in order of prefer
 ### 6.2 Accountability threshold and blast radius
 
 The active policy's `threshold` is the minimum effective trust level eligible
-for the clean channel. The draft v0.7 baseline threshold is `T2`: before
+for the clean channel. The draft v0.8 baseline threshold is `T2`: before
 empirical validation of T1 efficacy (§12.1), independently agent-reviewed code
 does not satisfy the portable baseline clean profile. Policies MAY choose a
 different threshold, but any conformance claim MUST identify the threshold used.
@@ -662,11 +677,11 @@ review classes) MUST be preserved even though the tag carries only the scalar
 level (§3.2), and `supersedes` links promotion/demotion decisions.
 
 The successor release predicate type is `https://semver-trust.dev/release/v0.2`.
-It is the first release predicate allowed to claim v0.7/v0.6/v0.5/v0.4 trust-chain
+It is the first release predicate allowed to claim v0.8/v0.7/v0.6/v0.5/v0.4 trust-chain
 conformance. Its schema is `schemas/release-v0.2.json`; the matching review
 successor is `https://semver-trust.dev/review/v0.2`.
 
-A v0.7 release attestation MUST additionally bind the interval mode and resolved
+A v0.8 release attestation MUST additionally bind the interval mode and resolved
 `TO`; the resolved adoption boundary for adoption mode; the cryptographic
 identity of the accepted predecessor attestation for recurring mode; the active
 policy and role-separated trust-material digests that evaluated the interval;
@@ -681,7 +696,7 @@ that selected the active state. The release decision binding includes the
 claimed bump, semantic floor, accountability threshold, strategy, channel, and
 supersession identity.
 Predicate v0.1 cannot express those continuity claims and MUST NOT be used to
-claim v0.7/v0.6/v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
+claim v0.8/v0.7/v0.6/v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
 or fixture expectations and assigns them no v0.4 continuity meaning. Because
 v0.1 did not encode its evaluator/specification profile, v0.2 successor
 attestations MUST bind explicit specification, predicate, evaluator,
@@ -692,7 +707,7 @@ new predicate URI and schema. Version-state identities in `release/v0.2` carry a
 canonicalization profile; v0.2 emission is blocked until that profile is
 implemented by emitters and reproducible by verifiers.
 
-Migration from v0.1 establishes a new authenticated v0.7 chain genesis. The
+Migration from v0.1 establishes a new authenticated v0.8 chain genesis. The
 bootstrap descriptor MAY independently pin a selected legacy `TO` as an included
 adoption boundary and a canonical clean legacy tag as a version predecessor when
 each satisfies §5.2 and §7.5. Neither binding implies the other: the version
@@ -704,7 +719,9 @@ it does not bind the active/candidate policy, trust, and version state.
 
 - Attestations MUST be signed (sigstore keyless with a transparency log entry, or organization-managed keys).
 - Storage options: a git ref namespace (e.g., `refs/attestations/*`), an OCI registry (attestation-as-artifact), or a transparency-log-backed store (Rekor). Git notes are acceptable for convenience but are mutable and not fetched or protected by default — **storage integrity is never the trust anchor; the signature inside the attestation is.** Verifiers MUST validate signatures and subject digests regardless of where the attestation was fetched from.
-- Review attestations (§4.3), derivation results (§4.4), promotion evidence (§7.3), and release attestations (§8.1) share the storage and signing requirements.
+- Review attestations (§4.3), non-authoritative derivation metadata (§4.4),
+  promotion evidence (§7.3), and release attestations (§8.1) share the storage
+  and signing requirements.
 
 ## 9. Policy file
 
@@ -734,17 +751,11 @@ docs    = "low"
 paths          = [".semver-trust/**", ".github/workflows/**", "CODEOWNERS"]
 required_level = "T3"
 
-[[derivation]]
-name    = "openapi-server"
-inputs  = ["api/openapi.yaml", "tools/oapi-codegen.version"]
-command = "make generate"           # toolchain pinned via the inputs above
-outputs = ["internal/gen/**"]
-
-[[derivation]]
-name    = "gofmt"
-inputs  = ["**/*.go"]
-command = "gofmt -l -w ."
-outputs = ["**/*.go"]               # formatting-only degenerate derivation (§4.4)
+[derivation]
+# Non-authoritative metadata only in the portable baseline (§4.4). A future
+# proof profile may define executable or non-executable derivation evidence, but
+# this policy cannot make verifier command execution part of baseline trust.
+profile = "none"
 
 [identity]
 # registry of keys trusted to sign review/release attestations — SSHSIG over the
@@ -838,7 +849,9 @@ decision selected for superseding re-evaluation:
 6. **Enforce meta paths:** apply the active required level to the union of active
    and candidate meta/policy/trust-material paths. Any violation → **abort**
    (§5.4).
-7. **Apply derivation proofs** (§4.4) under the active policy.
+7. **Handle derivation claims:** record any derivation metadata (§4.4), but do
+   not execute repository/policy commands and do not raise path trust from
+   unsupported derivation claims.
 8. **Partition by scope** (§5.1) under the active policy and compute
    `own_trust` (§5.2). Candidate scope changes do not affect the current interval.
 9. **Propagate:** resolve the internal dependency graph at consumed versions,
@@ -847,12 +860,12 @@ decision selected for superseding re-evaluation:
 10. **Collect evidence** under the active policy: run configured providers and
     compute the semantic floor (§6.1) and blast score (§6.2).
 11. **Decide and derive the tag:** evaluate the active policy threshold (§6.2),
-    baseline table (§6.4), and strategy (§6.3), honoring the semantic floor unconditionally. Apply the
-    signed advance/re-cut/supersede action to authenticated version state and
-    for a re-cut, supersession, or advance from an unpromoted target reconstruct
-    the complete target lineage under each interval's bound authority. Derive
-    target-level trust, blast, semantic floor, exact target core, and iteration
-    (§7.5). Any occupied output tag,
+    baseline table (§6.4), and strategy (§6.3), honoring the semantic floor
+    unconditionally. Apply the signed advance/re-cut/supersede action to
+    authenticated version state and for a re-cut, supersession, or advance from
+    an unpromoted target reconstruct the complete target lineage under each
+    interval's bound authority. Derive target-level trust, blast, semantic
+    floor, exact target core, and iteration (§7.5). Any occupied output tag,
     incomplete target lineage, incompatible re-cut, or version-state mismatch →
     **abort**; a superseding semantic invalidation follows §7.5's
     attestation-only path instead.
@@ -885,7 +898,7 @@ decision selected for superseding re-evaluation:
 | Identity laundering (agent under human key) | Accountability semantics stated normatively (§4.2); agent trailers required by policy; CI agents forced onto machine identities; spot audits | **Accepted & documented** — T2/T3 mean "human stands behind it," not "human typed it" |
 | Actor-map laundering | Actor map is policy/trust material selected by bootstrap or accepted predecessor state; meta-path and policy-transition rules protect actor-map changes (§4.2, §5.4, §9) | T3 means two distinct canonical human actors under the issuer's identity policy, not independently proven natural-person distinctness or non-collusion |
 | Review rubber-stamping | Compatibility evidence and blast policy still apply (differ proofs, coverage); distinct-actor requirement for T3; audit trails in attestations | Moderate — review *quality* is out of scope by design |
-| Payload hidden in "trivial" commit | No de-minimis exception (§5.1); only verified derivations bypass flooring | Low |
+| Payload hidden in "trivial" or generated commit | No de-minimis exception (§5.1); no executable derivation bypass in the portable baseline (§4.4) | Low |
 | Risk laundering via shared libs | Transitive propagation over the workspace graph (§5.3) | Low |
 | Scope-map / policy tampering | Bootstrap/predecessor selects active policy; authority-pinned workflows and union meta-paths require the active level; candidate activates only after acceptance (§5.4) | Low |
 | Candidate key self-enrollment | Candidate-only identities cannot verify their transition; old roots govern the interval (§5.4) | Low |
@@ -896,7 +909,7 @@ decision selected for superseding re-evaluation:
 | Squash/rebase provenance destruction | Forbid, or capture pre-squash provenance in merge attestation (§4.3) | Low |
 | Conflict-resolution smuggling in merge commits | Non-empty merge diffs classified as authored changes (§4.3.4) | Low |
 | Attestation store tampering | Signatures detect forgery; an authoritative current-state or transparency profile is needed to detect hidden successors/demotions (§8.2) | Moderate until §12.9 is resolved |
-| Generator/toolchain compromise | Toolchain pinned as derivation input; pin changes are ordinary trust-classified commits (§4.4) | Moderate — inherits general supply-chain exposure |
+| Generator/toolchain compromise | Portable baseline verifiers do not execute repository-selected derivation commands or use derivation claims to raise trust (§4.4) | Low for baseline; future proof profiles must address toolchain compromise explicitly |
 | History rewrite on protected branch | Immutable predecessor/`TO` bindings and ancestry checks; rewrite ⇒ verification failure (§10) | Low |
 | Gaming promotion cascades | Promotion requires its own signed evidence and re-runs the full decision (§7.3) | Low |
 
@@ -928,10 +941,24 @@ decision selected for superseding re-evaluation:
 Workspace: `services/auth`, `services/billing`, `pkg/common`; graph: both services depend on `common`. Policy: threshold T2, strategy `demote`.
 
 1. Since `common/v0.8.4`, `pkg/common` received three commits from a CI agent (machine identity, `Provenance: agent`, no review) → `own(common) = T0`. Release cut: `common/v0.9.0-t0.1` (pre-release channel; MINOR floor from `apidiff`: additive only).
-2. `services/auth` since `auth/v1.3.2`: five human-authored, human-reviewed commits (`own(auth) = T3`) plus regenerated `internal/gen/**` from a reviewed OpenAPI spec change — derivation proof verifies, generated paths inherit the spec commits' T3. But `effective(auth) = min(T3, effective(common)) = T0`. Decision: `auth/v1.4.0-t0.1`, floor source recorded as `common@v0.9.0-t0.1`.
+2. `services/auth` since `auth/v1.3.2`: five human-authored,
+   human-reviewed commits plus regenerated `internal/gen/**` committed by a CI
+   agent. The OpenAPI spec was reviewed, but the portable baseline does not
+   execute derivation commands or raise generated outputs from derivation
+   metadata (§4.4), so the generated commit contributes T0 and
+   `own(auth) = T0`. Decision: `auth/v1.4.0-t0.1`; the attestation records both
+   the local derivation metadata and the fact that it supplied no portable trust
+   elevation.
 3. A maintainer reviews `common`'s three commits post-hoc; a signed review attestation lands. Re-evaluation: `own(common) = T2` ≥ threshold → promotion tag `common/v0.9.0` on the identical SHA, superseding attestation published.
-4. Cascade: `auth`'s pinned floor source resolves as promoted; re-evaluation gives `effective(auth) = min(own T3, common T2) = T2`, which meets the threshold → `auth/v1.4.0` on the same SHA (attestation records `effective: T2`, `own: T3`, floor source `common@v0.9.0`). No rebuild of source occurred at any step; only evidence changed.
-5. A later `billing` release includes one commit editing `.semver-trust/policy.toml` authored at T2 while meta-paths require T3 → verification **fails**; no tag is produced until the policy change is re-reviewed.
+4. Cascade check: `auth`'s pinned floor source now resolves as promoted, but
+   `auth` still cannot promote because its own generated-output commit remains
+   T0. A later qualified human review of that generated-output commit can
+   produce a superseding `auth/v1.4.0` attestation on the same SHA; until then,
+   the release remains `auth/v1.4.0-t0.1`.
+5. A later `billing` release includes one commit editing
+   `.semver-trust/policy.toml` authored at T2 while meta-paths require T3 →
+   verification **fails**; no tag is produced until the policy change is
+   re-reviewed.
 
 ## Appendix B: Level assignment quick reference
 
@@ -949,7 +976,8 @@ human               |   T2   |   T2   |   T3**
 ## Appendix C: Changes from v0.1
 
 - Added Principle 6 — levels order accountability, not risk — to §1.1, with a §3.1 clarification (spec repository ADR-019).
-- §4.4: derivation toolchain pins are self-contained and language-native; environment-manager state is excluded as a derivation input (ADR-015).
+- §4.4 added derivation toolchain pinning guidance in draft v0.2 (ADR-015);
+  ADR-015 was later superseded by ADR-033 in draft v0.8.
 - §12.6 naming resolved (ADR-013); predicate-type URIs bound to `semver-trust.dev` in §4.3 and §8.1. The review predicate version was aligned from `v1` to `v0.1` to match specification maturity — permissible only because no attestation has yet been emitted.
 - New open questions: §12.7 (security-patch velocity vs. channel demotion) and §12.8 (empirical validation of the trust–outcome link), from the adversarial review at `docs/analysis/2026-07-02-steelman.md`.
 - No changes to the trust taxonomy, level assignment, aggregation, propagation, encoding grammar, decision tables, or verification algorithm.
@@ -1057,6 +1085,20 @@ human               |   T2   |   T2   |   T3**
 - Provider-specific blast scoring is portable only when bound to a named,
   versioned blast-scoring profile; otherwise it is local policy input rather
   than a cross-implementation conformance claim.
+
+## Appendix I: Changes from v0.7
+
+- §4.4 removes executable derivation proofs from the portable baseline
+  (ADR-033, superseding ADR-004 and ADR-015). Verifiers do not execute
+  repository- or policy-supplied commands to raise generated-output trust.
+- Fixed-point/idempotence evidence is distinguished from derivation evidence:
+  byte-identical regeneration of an already committed tree is not proof that
+  outputs came from trusted inputs.
+- Generated outputs, formatting-only commits, and lockfile rewrites are
+  classified by ordinary authorship/review evidence under the no-de-minimis
+  rule unless a future accepted proof profile defines stronger evidence.
+- Aggregation conformance vectors now require derivation claims to fail closed
+  to raw commit trust in the portable baseline.
 
 ---
 

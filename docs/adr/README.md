@@ -9,7 +9,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-001 | [Encode trust in SemVer pre-release identifiers, not build metadata](0001-encode-trust-in-semver-pre-release-identifiers-not-build-metadata.md) | Accepted (draft v0.1) |
 | ADR-002 | [Trust levels count independent accountable humans](0002-trust-levels-count-independent-accountable-humans.md) | Accepted (draft v0.1) |
 | ADR-003 | [Scalar level in the tag; full provenance vector in the attestation](0003-scalar-level-in-the-tag-full-provenance-vector-in-the-attestation.md) | Accepted (draft v0.1) |
-| ADR-004 | [Derivation proofs are the only exception to weakest-link flooring](0004-derivation-proofs-are-the-only-exception-to-weakest-link-flooring.md) | Accepted (draft v0.1) |
+| ADR-004 | [Derivation proofs are the only exception to weakest-link flooring](0004-derivation-proofs-are-the-only-exception-to-weakest-link-flooring.md) | Superseded by ADR-033 (2026-07-13) |
 | ADR-005 | [Bump policy: semantic floor + evidence ceiling, two strategies](0005-bump-policy-semantic-floor-evidence-ceiling-two-strategies.md) | Accepted (draft v0.1) |
 | ADR-006 | [Path-scoped trust with transitive propagation is first-class](0006-path-scoped-trust-with-transitive-propagation-is-first-class.md) | Accepted (draft v0.1) |
 | ADR-007 | [Configuration is the root of trust; meta-path violations hard-fail](0007-configuration-is-the-root-of-trust-meta-path-violations-hard-fail.md) | Superseded by ADR-028 (2026-07-12) |
@@ -20,7 +20,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-012 | [External dependencies out of scope for v0.1](0012-external-dependencies-out-of-scope-for-v0-1.md) | Accepted (draft v0.1) |
 | ADR-013 | [Naming and repository topology](0013-naming-and-repository-topology.md) | Accepted (2026-07-04) |
 | ADR-014 | [Licensing and control strategy](0014-licensing-and-control-strategy.md) | Accepted (2026-07-04) |
-| ADR-015 | [Derivation inputs pinning via language-native mechanisms](0015-derivation-inputs-pin-via-language-native-mechanisms-not-environment-managers.md) | Accepted (2026-07-04) |
+| ADR-015 | [Derivation inputs pinning via language-native mechanisms](0015-derivation-inputs-pin-via-language-native-mechanisms-not-environment-managers.md) | Superseded by ADR-033 (2026-07-13) |
 | ADR-016 | [Development environments outcome-based convention](0016-development-environments-outcome-based-convention-devbox-as-maintainer-default.md) | Accepted (2026-07-04) |
 | ADR-017 | [Roadmap reorders around demand side artifacts and keystone instrumentation](0017-roadmap-reorders-around-demand-side-artifacts-and-keystone-instrumentation.md) | Accepted (2026-07-04) |
 | ADR-018 | [Verification interfaces accept injectable trust roots and clock from day one](0018-verification-interfaces-accept-injectable-trust-roots-and-clock-from-day-one.md) | Accepted (2026-07-04) |
@@ -38,6 +38,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-030 | [Predicate v0.1 is historical and successor predicates carry explicit profile identity](0030-predicate-v0-1-is-historical-and-successor-predicates-carry-explicit-profile-identity.md) | Accepted (2026-07-12) |
 | ADR-031 | [Qualified review requires final-revision approval and canonical actors](0031-qualified-review-requires-final-revision-approval-and-canonical-actors.md) | Accepted (2026-07-12) |
 | ADR-032 | [Threshold is a hard clean-channel accountability gate](0032-threshold-is-a-hard-clean-channel-accountability-gate.md) | Accepted (2026-07-13) |
+| ADR-033 | [Executable derivation proofs are out of the portable baseline](0033-executable-derivation-proofs-are-out-of-the-portable-baseline.md) | Accepted (2026-07-13) |
 
 ## Adding an ADR
 
