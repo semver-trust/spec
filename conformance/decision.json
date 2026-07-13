@@ -1,7 +1,7 @@
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.6",
-  "description": "Release-decision kernel vectors for SemVer-Trust (spec/semver-trust.md §6.1-§6.4, §7.1, Appendix A), encoding the §6.4 default decision table (the illustrative policy; tuned tables are out of scope). Version base and trust-suffix iteration inputs are authenticated/derived §7.5 intermediates, never caller authority; version-ancestry.json tests their selection. Expected: the channel, the final bump (max of claim and semantic floor — the floor is honored unconditionally), and the exact §7.1 tag. 'Differ proof required' cells resolve to pre-release when no differ is available (§1.1 honest degradation); the requirement is qualified to PATCH claims where the table says so, and unqualified on the T1/low cell. Under 'inflate', vectors assert whether the bump escalates ('escalate'); the escalation target (MINOR vs MAJOR) is a policy choice per §6.3, so escalated vectors carry null bump/version.",
+  "spec_version": "0.7",
+  "description": "Release-decision kernel vectors for SemVer-Trust (spec/semver-trust.md §6.1-§6.4, §7.1, Appendix A), encoding the §6.4 baseline decision table. Version base and trust-suffix iteration inputs are authenticated/derived §7.5 intermediates, never caller authority; version-ancestry.json tests their selection. Expected: the channel, the final bump (max of claim and semantic floor — the floor is honored unconditionally), and the exact §7.1 tag. The threshold input is a hard clean-channel accountability gate evaluated before the blast/differ table. 'Differ proof required' cells resolve to pre-release when no differ is available (§1.1 honest degradation). Under 'inflate', vectors assert whether the bump escalates ('escalate'); the escalation target (MINOR vs MAJOR) is a policy choice per §6.3, so escalated vectors carry null bump/version.",
   "vectors": [
     {
       "id": "decision/table/t3-low",
@@ -10,6 +10,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T3",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "demote",
         "differ_available": true,
@@ -27,6 +28,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T3",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,
@@ -44,6 +46,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T3",
+        "threshold": "T2",
         "blast": "high",
         "strategy": "demote",
         "differ_available": true,
@@ -61,6 +64,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T2",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "demote",
         "differ_available": true,
@@ -78,6 +82,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T2",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,
@@ -95,6 +100,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T2",
+        "threshold": "T2",
         "blast": "high",
         "strategy": "demote",
         "differ_available": true,
@@ -108,10 +114,11 @@
     {
       "id": "decision/table/t1-low",
       "kind": "decision",
-      "description": "T1 x low: clean — the (unqualified) differ proof requirement is satisfied.",
+      "description": "T1 x low under the baseline T2 threshold: pre-release even when the differ proof requirement is satisfied.",
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T1",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "demote",
         "differ_available": true,
@@ -120,7 +127,7 @@
         "authenticated_version_base": "v1.2.3",
         "authenticated_iteration": 1
       },
-      "expected": { "channel": "clean", "bump": "patch", "version": "v1.2.4" }
+      "expected": { "channel": "prerelease", "bump": "patch", "version": "v1.2.4-t1.1" }
     },
     {
       "id": "decision/table/t1-moderate",
@@ -129,6 +136,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T1",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,
@@ -146,6 +154,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T1",
+        "threshold": "T2",
         "blast": "high",
         "strategy": "demote",
         "differ_available": true,
@@ -163,6 +172,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T0",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "demote",
         "differ_available": true,
@@ -180,6 +190,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T0",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,
@@ -197,6 +208,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T0",
+        "threshold": "T2",
         "blast": "high",
         "strategy": "demote",
         "differ_available": true,
@@ -214,6 +226,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T3",
+        "threshold": "T2",
         "blast": "high",
         "strategy": "demote",
         "differ_available": false,
@@ -231,6 +244,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T2",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": false,
@@ -244,10 +258,11 @@
     {
       "id": "decision/degrade/t1-low-minor-no-differ",
       "kind": "decision",
-      "description": "The T1 x low differ requirement is unqualified — it applies to any claim, not just PATCH: a MINOR claim without a differ demotes.",
+      "description": "T1 remains pre-release in the portable baseline before empirical validation, even for low blast and a MINOR claim.",
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T1",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "demote",
         "differ_available": false,
@@ -265,6 +280,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T2",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": false,
@@ -282,6 +298,7 @@
       "spec": "§6.4",
       "inputs": {
         "effective_trust": "T3",
+        "threshold": "T2",
         "blast": "high",
         "strategy": "demote",
         "differ_available": false,
@@ -299,6 +316,7 @@
       "spec": "§6.1",
       "inputs": {
         "effective_trust": "T3",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "demote",
         "differ_available": true,
@@ -316,6 +334,7 @@
       "spec": "§6.1",
       "inputs": {
         "effective_trust": "T3",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "demote",
         "differ_available": true,
@@ -333,6 +352,7 @@
       "spec": "§6.1",
       "inputs": {
         "effective_trust": "T0",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "demote",
         "differ_available": true,
@@ -344,12 +364,49 @@
       "expected": { "channel": "prerelease", "bump": "major", "version": "v2.0.0-t0.1" }
     },
     {
+      "id": "decision/threshold/t2-moderate-at-threshold-t1",
+      "kind": "decision",
+      "description": "A T2 x moderate MINOR claim remains clean when threshold is lowered from T2 to T1.",
+      "spec": "§6.2, §6.4",
+      "inputs": {
+        "effective_trust": "T2",
+        "threshold": "T1",
+        "blast": "moderate",
+        "strategy": "demote",
+        "differ_available": false,
+        "semantic_floor": "minor",
+        "claimed_bump": "minor",
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
+      },
+      "expected": { "channel": "clean", "bump": "minor", "version": "v1.3.0" }
+    },
+    {
+      "id": "decision/threshold/t2-moderate-at-threshold-t3",
+      "kind": "decision",
+      "description": "Changing only threshold from T2 to T3 makes an otherwise clean T2 x moderate MINOR claim prerelease.",
+      "spec": "§6.2, §6.4",
+      "inputs": {
+        "effective_trust": "T2",
+        "threshold": "T3",
+        "blast": "moderate",
+        "strategy": "demote",
+        "differ_available": false,
+        "semantic_floor": "minor",
+        "claimed_bump": "minor",
+        "authenticated_version_base": "v1.2.3",
+        "authenticated_iteration": 1
+      },
+      "expected": { "channel": "prerelease", "bump": "minor", "version": "v1.3.0-t2.1" }
+    },
+    {
       "id": "decision/iteration/re-cut",
       "kind": "decision",
       "description": "The decision kernel renders the authenticated second T1 iteration derived by §7.5 as -t1.2; callers do not select the value.",
       "spec": "§7.2",
       "inputs": {
         "effective_trust": "T1",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,
@@ -367,6 +424,7 @@
       "spec": "§6.3",
       "inputs": {
         "effective_trust": "T0",
+        "threshold": "T2",
         "blast": "low",
         "strategy": "inflate",
         "differ_available": true,
@@ -384,6 +442,7 @@
       "spec": "§6.3",
       "inputs": {
         "effective_trust": "T2",
+        "threshold": "T2",
         "blast": "high",
         "strategy": "inflate",
         "differ_available": true,
@@ -401,6 +460,7 @@
       "spec": "§6.3",
       "inputs": {
         "effective_trust": "T3",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "inflate",
         "differ_available": true,
@@ -418,6 +478,7 @@
       "spec": "Appendix A",
       "inputs": {
         "effective_trust": "T0",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,
@@ -435,6 +496,7 @@
       "spec": "Appendix A",
       "inputs": {
         "effective_trust": "T0",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,
@@ -452,6 +514,7 @@
       "spec": "Appendix A",
       "inputs": {
         "effective_trust": "T2",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,
@@ -469,6 +532,7 @@
       "spec": "Appendix A",
       "inputs": {
         "effective_trust": "T2",
+        "threshold": "T2",
         "blast": "moderate",
         "strategy": "demote",
         "differ_available": true,

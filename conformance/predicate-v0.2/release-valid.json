@@ -9,7 +9,7 @@
   "predicateType": "https://semver-trust.dev/release/v0.2",
   "predicate": {
     "profile": {
-      "specification": { "name": "semver-trust", "version": "0.6" },
+      "specification": { "name": "semver-trust", "version": "0.7" },
       "predicate_contract": { "name": "release", "version": "0.2" },
       "evaluator": { "name": "semver-trust-fixture", "version": "0.0.0" },
       "repository_identity": { "name": "fixture-repository", "version": "0.1" },
@@ -111,6 +111,7 @@
     "decision": {
       "claimed_bump": "minor",
       "semantic_floor": "minor",
+      "threshold": "T2",
       "strategy": "demote",
       "channel": "prerelease",
       "supersedes": null

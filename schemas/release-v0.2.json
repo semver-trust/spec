@@ -331,11 +331,19 @@
     },
     "releaseDecision": {
       "type": "object",
-      "required": ["claimed_bump", "semantic_floor", "strategy", "channel", "supersedes"],
+      "required": [
+        "claimed_bump",
+        "semantic_floor",
+        "threshold",
+        "strategy",
+        "channel",
+        "supersedes"
+      ],
       "additionalProperties": false,
       "properties": {
         "claimed_bump": { "$ref": "#/$defs/bump" },
         "semantic_floor": { "$ref": "#/$defs/bump" },
+        "threshold": { "$ref": "#/$defs/trustLevel" },
         "strategy": { "type": "string", "enum": ["demote", "inflate"] },
         "channel": { "type": "string", "enum": ["clean", "prerelease"] },
         "supersedes": {
