@@ -8,9 +8,9 @@ reference implementation treats them as acceptance tests, and any other implemen
 passing them.
 
 The Go reference implementation currently implements the draft v0.3 vector
-set. The v0.4/v0.5/v0.6 range, policy-transition, version-ancestry, successor
-predicate, and qualified-review groups in this revision are the source contract
-for its next coordinated, digest-pinned update.
+set. The v0.4–v0.7 range, policy-transition, version-ancestry, successor
+predicate, qualified-review, and threshold-decision groups in this revision are
+the source contract for its next coordinated, digest-pinned update.
 
 Each vector is derived directly from a normative section of the spec and carries a `spec` back-reference to
 it. The vectors in this directory cover **level assignment** (§3.2, §3.3, §4.1–§4.2), **version precedence
@@ -33,7 +33,7 @@ capability limitation (SSH-only, with fail-closed behavior on other key families
 | `precedence.json` | SemVer precedence ordering vectors + §7.1 tag-grammar vectors | Apache 2.0 |
 | `aggregation.json` | Scope partitioning, per-scope floor, and meta-path hard-fail vectors | Apache 2.0 |
 | `propagation.json` | Effective-trust propagation vectors over dependency graphs (incl. SCCs) | Apache 2.0 |
-| `decision.json` | §6.4 decision-table vectors: trust × blast × strategy → channel/version | Apache 2.0 |
+| `decision.json` | §6.4 baseline decision vectors: threshold × trust × blast × strategy → channel/version | Apache 2.0 |
 | `range.json` | Inception/adoption/recurring interval and predecessor-chain vectors | Apache 2.0 |
 | `version-ancestry.json` | Genesis/recurring/superseding version-state and exact-tag vectors | Apache 2.0 |
 | `policy-transition.json` | Bootstrap, previous-policy, meta-path, and delayed-activation vectors | Apache 2.0 |
@@ -49,21 +49,21 @@ against these vectors.
 
 ## `spec_version` pinning
 
-Every vector file carries a top-level `spec_version` (currently `"0.6"`). It names the spec draft the vectors
+Every vector file carries a top-level `spec_version` (currently `"0.7"`). It names the spec draft the vectors
 encode, not the version of the vector set. The rules:
 
-- The vectors track the pinned spec draft. When they say `"0.6"`, their expectations are those of
-  `spec/semver-trust.md` **Draft v0.6**.
+- The vectors track the pinned spec draft. When they say `"0.7"`, their expectations are those of
+  `spec/semver-trust.md` **Draft v0.7**.
 - All vector files in this directory MUST share the same `spec_version`; the validator enforces this and
   cross-checks it against the spec's draft header.
-- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.6 level and
+- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.7 level and
   precedence vectors" is the precise claim.
 
 The frozen v0.1 DSSE fixtures retain their v0.1 predicate bytes while their
-vector envelope is pinned to spec draft 0.6. Passing those vectors proves
+vector envelope is pinned to spec draft 0.7. Passing those vectors proves
 **backward verification** of historical v0.1 attestations only. It does not make
-v0.1 sufficient for a v0.6 release-conformance claim; §8.1 requires the v0.2
-successor predicate before v0.6 release emission.
+v0.1 sufficient for a v0.7 release-conformance claim; §8.1 requires the v0.2
+successor predicate before v0.7 release emission.
 
 The range, policy-transition, and version-ancestry files isolate independent
 dimensions for precise failures. Their authority fixtures are projections, not
@@ -80,7 +80,7 @@ Every vector file shares an envelope:
 ```json
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.6",
+  "spec_version": "0.7",
   "description": "…what this file covers…",
   "vectors": [ /* … */ ]
 }
@@ -322,16 +322,17 @@ commit receives.
 
 ### `decision.json` — kind: `decision`
 
-The §6.4 decision/rendering kernel (the illustrative policy; tuned tables are out of scope) with §6.1 semantic
-floor, §6.3 strategies, and §7.1 encoding. Its version fields are authenticated
-§7.5 intermediate values, not caller inputs; `version-ancestry.json` verifies
-their selection. `differ proof required` cells resolve to pre-release when
-`differ_available` is false (§1.1 honest degradation); the requirement is qualified to PATCH claims where
-the table says so, and unqualified on the T1/low cell.
+The §6.4 baseline decision/rendering kernel with §6.1 semantic floor, §6.2
+threshold gate, §6.3 strategies, and §7.1 encoding. Its version fields are
+authenticated §7.5 intermediate values, not caller inputs; `version-ancestry.json`
+verifies their selection. The threshold gate runs before the blast/differ table.
+`differ proof required` cells resolve to pre-release when `differ_available` is
+false (§1.1 honest degradation).
 
 | Field | Type | Meaning |
 |---|---|---|
 | `inputs.effective_trust` | string | `T0`–`T3`. |
+| `inputs.threshold` | string | Minimum effective trust eligible for the clean channel (`T0`–`T3`). |
 | `inputs.blast` | string | Qualitative blast score: `low`, `moderate`, `high` (§6.2). |
 | `inputs.strategy` | string | `demote` or `inflate` (§6.3). |
 | `inputs.differ_available` | bool | Whether a compatibility differ exists for the ecosystem (§6.1). |
@@ -376,7 +377,7 @@ the table says so, and unqualified on the T1/low cell.
 - **`policy_transition`** — select active policy from bootstrap/predecessor,
   enforce active identities plus union meta paths, validate candidate
   invariants, and assert evaluated/activated policy digests and failure reason.
-- **`decision`** — run the decision with the §6.4 default table; assert channel, bump, and the exact
+- **`decision`** — run the §6 baseline decision function; assert channel, bump, and the exact
   version string (or, for escalated `inflate` vectors, that the bump escalates).
 
 ## Versioning and stability

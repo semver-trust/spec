@@ -22,7 +22,7 @@ behind this release's claims*.
 
 ## Read the specification
 
-**[SemVer-Trust specification — draft v0.6](spec/semver-trust.md)**
+**[SemVer-Trust specification — draft v0.7](spec/semver-trust.md)**
 
 New readers: start with §1 (principles), §3 (the trust model), and
 Appendix A (a worked monorepo example). The project keeps its full
@@ -44,16 +44,18 @@ decision is the way it is.
 
 ## Status
 
-The specification is a **v0.6 working draft**. The official Go
+The specification is a **v0.7 working draft**. The official Go
 implementation ([semver-trust-go](https://github.com/semver-trust/semver-trust-go))
 passes the draft v0.3 conformance suite and releases itself under the scheme
 (v0.1.0 and v0.2.0 are published, verified, reproducible dogfood). The legacy
-release path is not suitable for production claims until the v0.6 successor
+release path is not suitable for production claims until the v0.7 successor
 predicate behavior is implemented and covered by coordinated conformance
 fixtures. Draft v0.4 added release-interval, policy-transition, and
 authenticated version-ancestry vectors; draft v0.5 assigns successor
 release/review predicate types and schemas for the compatibility-critical state
-bindings; draft v0.6 adds qualified-review and canonical-actor conformance.
+bindings; draft v0.6 adds qualified-review and canonical-actor conformance;
+draft v0.7 makes threshold a hard clean-channel accountability gate and
+separates accountability from blast/risk policy.
 Design discussion happens in [issues](https://github.com/semver-trust/spec/issues) — see
 [CONTRIBUTING](CONTRIBUTING.md) before opening a pull request.
 

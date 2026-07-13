@@ -529,9 +529,10 @@ def _policy_transition(doc: dict, inputs: dict) -> dict:
     }
 
 
-# §6.4 default decision table. Cell values: the clean channel is available
-# unconditionally, conditioned on a differ proof for PATCH claims, conditioned
-# on a differ proof for any claim (the T1/low cell), or unavailable.
+# §6.4 default decision table after the §6.2 threshold gate. Cell values:
+# the clean channel is available unconditionally, conditioned on a differ proof
+# for PATCH claims, or unavailable. The portable baseline does not allow T1 to
+# satisfy the clean profile before empirical validation.
 _TABLE = {
     ("T3", "low"): "clean",
     ("T3", "moderate"): "clean",
@@ -539,7 +540,7 @@ _TABLE = {
     ("T2", "low"): "clean",
     ("T2", "moderate"): "differ_patch",
     ("T2", "high"): "prerelease",
-    ("T1", "low"): "differ_any",
+    ("T1", "low"): "prerelease",
     ("T1", "moderate"): "prerelease",
     ("T1", "high"): "prerelease",
     ("T0", "low"): "prerelease",
@@ -551,8 +552,13 @@ _TABLE = {
 def _decision_outcome(inputs: dict) -> dict:
     cell = _TABLE[(inputs["effective_trust"], inputs["blast"])]
     bump = max(inputs["claimed_bump"], inputs["semantic_floor"], key=BUMP_RANK.__getitem__)
+    below_threshold = LEVEL_RANK[inputs["effective_trust"]] < LEVEL_RANK[inputs["threshold"]]
     differ_needed = cell == "differ_any" or (cell == "differ_patch" and bump == "patch")
-    demoted = cell == "prerelease" or (differ_needed and not inputs["differ_available"])
+    demoted = (
+        below_threshold
+        or cell == "prerelease"
+        or (differ_needed and not inputs["differ_available"])
+    )
 
     if inputs["strategy"] == "inflate":
         if demoted:
@@ -1254,6 +1260,12 @@ def check_decision(vectors: list[dict]) -> None:
     }
     missing = [f"{t}/{b}" for t, b in _TABLE if (t, b) not in demote_cells]
     check("decision-table-exhaustive", not missing, f"uncovered §6.4 cells: {missing}")
+    thresholds = {v["inputs"]["threshold"] for v in dec}
+    check(
+        "decision-threshold-coverage",
+        {"T1", "T2", "T3"}.issubset(thresholds),
+        f"threshold vectors missing: {sorted({'T1', 'T2', 'T3'} - thresholds)}",
+    )
 
 
 def check_ranges(vectors: list[dict]) -> None:

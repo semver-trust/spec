@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # SemVer-Trust: Provenance-Scoped Trust Levels for Semantic Versioning
 
-**Draft v0.6**
+**Draft v0.7**
 **Status:** Design draft for review
-**Date:** 2026-07-12
+**Date:** 2026-07-13
 **Canonical home:** https://semver-trust.dev · https://github.com/semver-trust/spec
 
 ---
@@ -164,7 +164,7 @@ review.
 
 Review facts live outside git (platform PR approvals), so they MUST be captured into the provenance record at merge time:
 
-1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer canonical actors and their classes (human/agent), credential identities, approval verdicts, approval state, the PR/MR reference, covered revisions, final-revision or final-diff approval binding, repository and merge-context identity, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.6 release-conformance claims.
+1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer canonical actors and their classes (human/agent), credential identities, approval verdicts, approval state, the PR/MR reference, covered revisions, final-revision or final-diff approval binding, repository and merge-context identity, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.7 release-conformance claims.
 2. The attestation MUST be signed by the workflow's workload identity and stored per §8.2.
 3. A review is **qualified** for trust classification only if all of the following hold:
    - the verdict is `approved`;
@@ -346,19 +346,35 @@ ADR-028, superseding ADR-007.
 
 ## 6. Release evaluation
 
-A release decision consumes two independent inputs and applies policy:
+A release decision consumes three separate input families and applies the active
+policy:
 
-- **Semantic floor** — the *minimum* bump the change semantics permit.
-- **Evidence ceiling** — the *maximum* claim the provenance evidence supports.
+- **Compatibility evidence** — determines the semantic floor, the *minimum*
+  bump the change semantics permit (§6.1).
+- **Accountability evidence** — supplies the effective trust level and is
+  compared to the active policy's clean-channel threshold (§6.2). A trust level
+  is not a quality, security, safety, or compatibility score.
+- **Operational policy evidence** — supplies blast score and any supporting
+  provider facts the active policy chooses to consider (§6.2).
+
+The baseline decision function is deterministic:
+
+1. Compute the effective bump as the maximum of the claimed bump, semantic
+   floor, and any pending corrective bump from authenticated version state.
+2. Apply the accountability threshold. If `effective_trust < threshold`, the
+   clean channel is unavailable regardless of blast score or compatibility
+   evidence.
+3. If the threshold is met, evaluate the baseline blast/differ table (§6.4).
+4. Render the result through the selected enforcement strategy (§6.3): `demote`
+   uses the pre-release channel when the clean claim is unavailable; `inflate`
+   escalates the bump instead.
 
 The resulting effective bump and channel are applied to verifier-selected
 version state (§7.5). The producer may propose a signed version action and
 claimed bump, but it does not supply the prior version, tag prefix, or
-trust-suffix iteration. A pending corrective bump in authenticated version state
-is an additional floor applied before the decision channel and tag are derived.
-For re-cuts, supersessions, and advances from unpromoted targets, effective
-trust, blast, and compatibility evidence apply to the complete target lineage
-(§7.5), not only the newest source interval.
+trust-suffix iteration. For re-cuts, supersessions, and advances from
+unpromoted targets, effective trust, blast, and compatibility evidence apply to
+the complete target lineage (§7.5), not only the newest source interval.
 
 ### 6.1 Semantic floor
 
@@ -367,13 +383,18 @@ Determined by the strongest available compatibility evidence, in order of prefer
 1. **Compatibility differ** (evidence provider): `apidiff` (Go), `cargo-semver-checks` (Rust), `japicmp` (Java), API Extractor (TypeScript), etc. A detected breaking change in the public surface forces MAJOR. No trust level overrides the semantic floor — T3 code that breaks the API is still a MAJOR release.
 2. **Declared intent**: Conventional Commits (`feat:` → MINOR, `fix:` → PATCH, `!`/`BREAKING CHANGE:` → MAJOR) where no differ exists. Declared intent is weak evidence and interacts with §6.2 accordingly.
 
-### 6.2 Evidence ceiling and blast radius
+### 6.2 Accountability threshold and blast radius
 
-To *claim* a bump is to claim what it implies (PATCH: drop-in safe; MINOR: additive only). The claim must be supported by evidence proportional to risk:
+The active policy's `threshold` is the minimum effective trust level eligible
+for the clean channel. The draft v0.7 baseline threshold is `T2`: before
+empirical validation of T1 efficacy (§12.1), independently agent-reviewed code
+does not satisfy the portable baseline clean profile. Policies MAY choose a
+different threshold, but any conformance claim MUST identify the threshold used.
 
-```
-risk ∝ blast_radius × inverse(effective_trust)
-```
+To *claim* a bump is to claim what it implies (PATCH: drop-in safe; MINOR:
+additive only). Once the accountability threshold is met, the claim must also be
+supported by compatibility and operational-policy evidence appropriate to the
+blast score.
 
 **Blast-radius inputs** (pluggable; core inputs are language-agnostic, starred inputs come from evidence providers):
 
@@ -386,24 +407,39 @@ risk ∝ blast_radius × inverse(effective_trust)
 | Import-graph fan-in of touched packages * | language adapter |
 | Test coverage on changed lines * | coverage provider |
 
-Implementations map these to a qualitative score (`low` / `moderate` / `high`). This spec deliberately does not define a numeric formula; false precision here invites gaming. The score, its inputs, and the provider versions MUST all appear in the release attestation.
+Implementations map these to a qualitative score (`low` / `moderate` / `high`).
+This spec deliberately does not define a numeric formula; false precision here
+invites gaming. A blast score is portable across implementations only when a
+named, versioned blast-scoring profile defines the mapping. Otherwise the score
+is local policy input: it may be recorded and consumed by that policy, but it is
+not a cross-implementation conformance claim. The score, its inputs, provider
+versions, and scoring profile identity (or an explicit local-policy marker) MUST
+all appear in the release attestation.
 
 ### 6.3 Enforcement strategies
 
-When evidence does not support the claimed bump at the computed risk, policy selects one strategy:
+When the threshold gate or baseline blast/differ table does not support the
+clean claim, policy selects one strategy:
 
 - **`demote` (RECOMMENDED):** keep the semantically correct bump but confine the release to the pre-release channel (§7) until evidence accumulates — post-hoc human review, canary/soak results, audit. Preserves the API-compatibility meaning of MAJOR/MINOR/PATCH; consumers opt in explicitly.
 - **`inflate`:** escalate the bump (PATCH→MINOR or →MAJOR) so default-range consumers do not auto-adopt. Supported because some organizations want risk expressed in the precedence-relevant part of the version; costs include diluting MAJOR's "your code must change" signal and forcing migration review where no API changed.
 
-### 6.4 Default decision table (illustrative policy, tunable)
+### 6.4 Baseline decision table
 
-Channel for the *clean* (plain-version) release; anything else goes to the pre-release channel under `demote`, or bumps under `inflate`:
+This table is the portable baseline decision profile after the threshold gate
+in §6.2 has succeeded. It is deterministic for a supplied threshold, effective
+trust, blast score, strategy, differ availability, claimed bump, and semantic
+floor. Provider-specific blast scoring is outside baseline conformance unless a
+versioned blast-scoring profile is named.
+
+Channel for the *clean* (plain-version) release; anything else goes to the
+pre-release channel under `demote`, or bumps under `inflate`:
 
 | Effective trust | Blast: low | moderate | high |
 |---|---|---|---|
 | **T3** | clean | clean | clean, differ proof REQUIRED for PATCH claim |
 | **T2** | clean | clean, differ proof required for PATCH claim | pre-release |
-| **T1** | clean, differ proof required | pre-release | pre-release |
+| **T1** | pre-release | pre-release | pre-release |
 | **T0** | pre-release | pre-release | pre-release |
 
 Where no compatibility differ exists for the ecosystem, cells reading "differ proof required" resolve to **pre-release** — the honest-degradation principle (§1.1): less verification tooling means lower provable trust, not equal trust with less backing.
@@ -626,11 +662,11 @@ review classes) MUST be preserved even though the tag carries only the scalar
 level (§3.2), and `supersedes` links promotion/demotion decisions.
 
 The successor release predicate type is `https://semver-trust.dev/release/v0.2`.
-It is the first release predicate allowed to claim v0.6/v0.5/v0.4 trust-chain
+It is the first release predicate allowed to claim v0.7/v0.6/v0.5/v0.4 trust-chain
 conformance. Its schema is `schemas/release-v0.2.json`; the matching review
 successor is `https://semver-trust.dev/review/v0.2`.
 
-A v0.6 release attestation MUST additionally bind the interval mode and resolved
+A v0.7 release attestation MUST additionally bind the interval mode and resolved
 `TO`; the resolved adoption boundary for adoption mode; the cryptographic
 identity of the accepted predecessor attestation for recurring mode; the active
 policy and role-separated trust-material digests that evaluated the interval;
@@ -641,9 +677,11 @@ or predecessor, prior and resulting version-state identities, exact emitted tag
 or explicit no-emission marker, immutable lineage tag raw/peeled object IDs, and
 derived iteration where applicable; the target lineage's accepted interval
 identities and aggregate evidence; and the bootstrap descriptor or predecessor
-that selected the active state.
+that selected the active state. The release decision binding includes the
+claimed bump, semantic floor, accountability threshold, strategy, channel, and
+supersession identity.
 Predicate v0.1 cannot express those continuity claims and MUST NOT be used to
-claim v0.6/v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
+claim v0.7/v0.6/v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
 or fixture expectations and assigns them no v0.4 continuity meaning. Because
 v0.1 did not encode its evaluator/specification profile, v0.2 successor
 attestations MUST bind explicit specification, predicate, evaluator,
@@ -654,7 +692,7 @@ new predicate URI and schema. Version-state identities in `release/v0.2` carry a
 canonicalization profile; v0.2 emission is blocked until that profile is
 implemented by emitters and reproducible by verifiers.
 
-Migration from v0.1 establishes a new authenticated v0.6 chain genesis. The
+Migration from v0.1 establishes a new authenticated v0.7 chain genesis. The
 bootstrap descriptor MAY independently pin a selected legacy `TO` as an included
 adoption boundary and a canonical clean legacy tag as a version predecessor when
 each satisfies §5.2 and §7.5. Neither binding implies the other: the version
@@ -808,8 +846,8 @@ decision selected for superseding re-evaluation:
    and the floor source.
 10. **Collect evidence** under the active policy: run configured providers and
     compute the semantic floor (§6.1) and blast score (§6.2).
-11. **Decide and derive the tag:** evaluate the active policy table (§6.4) and
-    strategy (§6.3), honoring the semantic floor unconditionally. Apply the
+11. **Decide and derive the tag:** evaluate the active policy threshold (§6.2),
+    baseline table (§6.4), and strategy (§6.3), honoring the semantic floor unconditionally. Apply the
     signed advance/re-cut/supersede action to authenticated version state and
     for a re-cut, supersession, or advance from an unpromoted target reconstruct
     the complete target lineage under each interval's bound authority. Derive
@@ -846,7 +884,7 @@ decision selected for superseding re-evaluation:
 | Forged provenance trailers | Trailers advisory; identity class from verified signature governs; conflicts floor to agent (§3.2, §4.1) | Low |
 | Identity laundering (agent under human key) | Accountability semantics stated normatively (§4.2); agent trailers required by policy; CI agents forced onto machine identities; spot audits | **Accepted & documented** — T2/T3 mean "human stands behind it," not "human typed it" |
 | Actor-map laundering | Actor map is policy/trust material selected by bootstrap or accepted predecessor state; meta-path and policy-transition rules protect actor-map changes (§4.2, §5.4, §9) | T3 means two distinct canonical human actors under the issuer's identity policy, not independently proven natural-person distinctness or non-collusion |
-| Review rubber-stamping | Evidence ceiling still applies (differ proofs, coverage); distinct-identity requirement for T3; audit trails in attestations | Moderate — review *quality* is out of scope by design |
+| Review rubber-stamping | Compatibility evidence and blast policy still apply (differ proofs, coverage); distinct-actor requirement for T3; audit trails in attestations | Moderate — review *quality* is out of scope by design |
 | Payload hidden in "trivial" commit | No de-minimis exception (§5.1); only verified derivations bypass flooring | Low |
 | Risk laundering via shared libs | Transitive propagation over the workspace graph (§5.3) | Low |
 | Scope-map / policy tampering | Bootstrap/predecessor selects active policy; authority-pinned workflows and union meta-paths require the active level; candidate activates only after acceptance (§5.4) | Low |
@@ -864,7 +902,7 @@ decision selected for superseding re-evaluation:
 
 ## 12. Open questions
 
-1. **T1 efficacy.** Whether independent agent review measurably reduces defect/exploit rates versus none is unsettled; the level's policy pricing should follow evidence as it emerges.
+1. **T1 efficacy.** Whether independent agent review provides enough corroboration for any clean-channel policy is unsettled; the baseline excludes it until evidence emerges.
 2. **Trust decay.** Should clean releases age (e.g., unpatched components lose standing), or is trust strictly monotonic per release? Current position: attestations are supersedable (§7.3.5), but no time-based decay is defined.
 3. **External dependencies.** Interface point to SLSA levels exists (§1.2); a mapping between SLSA build levels and T-levels is deliberately not defined in v0.1.
 4. **Cross-repo propagation.** Effective trust across repository boundaries (internal registries of first-party components) — likely via consuming the dependency's release attestation — is deferred.
@@ -1004,6 +1042,21 @@ human               |   T2   |   T2   |   T3**
 - The review/v0.2 successor predicate, which had not emitted bytes before this
   decision, now carries the approval-state, coverage, merge-context, actor, and
   agent-independence facts required for draft v0.6 review classification.
+
+## Appendix H: Changes from v0.6
+
+- §6 defines threshold as a hard clean-channel accountability gate evaluated
+  before the blast/differ table (ADR-032).
+- §6 separates compatibility evidence, accountability evidence, and operational
+  blast policy inputs. Trust levels remain accountability claims, not quality,
+  security, safety, compatibility, or defect-probability scores.
+- The portable baseline threshold is T2; T1 does not satisfy the baseline clean
+  profile before empirical validation of independent agent-review efficacy.
+- §6.4 is now the deterministic baseline decision profile, and release/v0.2
+  decision bindings include the threshold used for replay.
+- Provider-specific blast scoring is portable only when bound to a named,
+  versioned blast-scoring profile; otherwise it is local policy input rather
+  than a cross-implementation conformance claim.
 
 ---
 

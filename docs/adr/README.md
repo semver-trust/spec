@@ -37,6 +37,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-029 | [Version ancestry is authenticated independently from release intervals](0029-version-ancestry-is-authenticated-independently-from-release-intervals.md) | Accepted (2026-07-12) |
 | ADR-030 | [Predicate v0.1 is historical and successor predicates carry explicit profile identity](0030-predicate-v0-1-is-historical-and-successor-predicates-carry-explicit-profile-identity.md) | Accepted (2026-07-12) |
 | ADR-031 | [Qualified review requires final-revision approval and canonical actors](0031-qualified-review-requires-final-revision-approval-and-canonical-actors.md) | Accepted (2026-07-12) |
+| ADR-032 | [Threshold is a hard clean-channel accountability gate](0032-threshold-is-a-hard-clean-channel-accountability-gate.md) | Accepted (2026-07-13) |
 
 ## Adding an ADR
 
