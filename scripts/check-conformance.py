@@ -1525,6 +1525,27 @@ PREDICATE_REQUIRED = {
         "merge_strategy",
         "timestamp",
     ),
+    "https://semver-trust.dev/release/v0.2": (
+        "profile",
+        "repository",
+        "component",
+        "interval",
+        "policy_state",
+        "version_state",
+        "trust",
+        "provenance",
+        "evidence",
+        "decision",
+        "timestamp",
+    ),
+    "https://semver-trust.dev/review/v0.2": (
+        "profile",
+        "repository",
+        "review_target",
+        "reviewers",
+        "merge",
+        "timestamp",
+    ),
 }
 
 

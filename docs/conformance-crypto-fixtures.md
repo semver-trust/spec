@@ -233,12 +233,15 @@ bug it is holding.
 
 ## 6. Attestation fixtures
 
-Attestation fixtures are DSSE envelopes signed by the §2 test keys over in-toto Statements. They use the
-**real** predicate-type URIs — `https://semver-trust.dev/release/v0.1` (spec §8.1) and
-`https://semver-trust.dev/review/v0.1` (spec §4.3) — never a placeholder, per the implementation plan's
-ground rule. Because §8.2 makes the signature inside the attestation the trust anchor and storage never the
-anchor, fixtures store envelopes as plain vendored files under `conformance/crypto/`; no git-notes, OCI, or
-Rekor store needs faking.
+Attestation fixtures are DSSE envelopes signed by the §2 test keys over in-toto
+Statements. They use the **real** predicate-type URIs — initially
+`https://semver-trust.dev/release/v0.1` (spec §8.1) and
+`https://semver-trust.dev/review/v0.1` (spec §4.3), later also the v0.2
+successor predicate URIs — never a placeholder, per the implementation plan's
+ground rule. Because §8.2 makes the signature inside the attestation the trust
+anchor and storage never the anchor, fixtures store envelopes as plain vendored
+files under `conformance/crypto/`; no git-notes, OCI, or Rekor store needs
+faking.
 
 **Reconciling the two constraints.** The real predicate URIs must coexist with go-repo `AGENTS.md` gate 2,
 which requires fixture attestations to be clearly-labeled test doubles that cannot escape the test tree. The

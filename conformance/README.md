@@ -71,8 +71,9 @@ dimensions for precise failures. Their authority fixtures are projections, not
 three alternative wire formats: a real accepted successor combines every
 source-interval, policy, and version-state field required by §8.1.
 `predicate-v0.2.json` adds unsigned positive and negative in-toto Statement
-payload fixtures for the successor schemas; signed v0.2 DSSE fixtures remain
-follow-up implementation work.
+payload fixtures for the successor schemas. The crypto attestation vectors also
+include signed positive DSSE envelopes for the v0.2 release and review
+successor predicates.
 
 ## Vector format
 

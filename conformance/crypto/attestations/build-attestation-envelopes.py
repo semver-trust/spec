@@ -36,6 +36,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 KEYS = HERE.parent / "keys"
 PAYLOADS = HERE / "payloads"
+PREDICATE_V02 = HERE.parent.parent / "predicate-v0.2"
 ENVELOPES = HERE / "envelopes"
 
 PAYLOAD_TYPE = "application/vnd.in-toto+json"
@@ -45,6 +46,8 @@ NAMESPACE = "attestation@semver-trust.dev"
 PLAN = {
     "review-valid.dsse.json": ("review-valid.json", "agent-ci-bot", None),
     "release-valid.dsse.json": ("release-valid.json", "agent-ci-bot", None),
+    "review-v02-valid.dsse.json": (PREDICATE_V02 / "review-valid.json", "agent-ci-bot", None),
+    "release-v02-valid.dsse.json": (PREDICATE_V02 / "release-valid.json", "agent-ci-bot", None),
     "release-schema-invalid.dsse.json": ("release-schema-invalid.json", "agent-ci-bot", None),
     "release-sig-invalid.dsse.json": (
         "release-valid.json",
@@ -55,6 +58,12 @@ PLAN = {
     ),
     "release-unknown-signer.dsse.json": ("release-valid.json", "unknown-mallory", None),
 }
+
+
+def payload_path(payload_file: str | Path) -> Path:
+    if isinstance(payload_file, Path):
+        return payload_file
+    return PAYLOADS / payload_file
 
 
 def pae(payload_type: str, payload: bytes) -> bytes:
@@ -98,7 +107,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         workdir = Path(tmp)
         for name, (payload_file, key, tamper) in PLAN.items():
-            payload = (PAYLOADS / payload_file).read_bytes()
+            payload = payload_path(payload_file).read_bytes()
             sig = sign(key, pae(PAYLOAD_TYPE, payload), workdir)
             if tamper is not None:
                 old, new = tamper

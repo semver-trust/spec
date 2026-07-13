@@ -58,15 +58,16 @@ everything else.
 
 ## Attestation envelopes (fixture plan §6)
 
-`attestations/` carries the DSSE fixtures — the **first emission of the
-frozen v0.1 predicate types**, under the §6 riders: real predicate URIs
-(`https://semver-trust.dev/release/v0.1`, `…/review/v0.1`), fake
-fixture-local subjects (the signed-history commit SHAs and a fixture tag),
-test-only keys, and every non-negative payload validated against the merged
-GO-010 JSON Schemas **before** signing. Unlike the fixture repositories, the
-envelopes are vendored frozen bytes: signed bytes cannot be patched, only
-regenerated (`build-attestation-envelopes.py`), and regeneration breaks
-downstream expectations — treat it as a ceremony, not a build step.
+`attestations/` carries the DSSE fixtures. The original fixtures were the
+**first emission of the frozen v0.1 predicate types**; the same directory now
+also includes signed positive envelopes for the v0.2 release/review successor
+predicates. All fixtures use real predicate URIs, fake fixture-local subjects
+(the signed-history commit SHAs and fixture tags), test-only keys, and every
+non-negative payload is validated against its registered JSON Schema **before**
+signing. Unlike the fixture repositories, the envelopes are vendored frozen
+bytes: signed bytes cannot be patched, only regenerated
+(`build-attestation-envelopes.py`), and regeneration breaks downstream
+expectations — treat it as a ceremony, not a build step.
 
 **Signature convention
 ([ADR-022](../../docs/adr/0022-attestation-signatures-are-sshsig-over-the-dsse-pae-with-purpose-binding-namespaces.md)).**

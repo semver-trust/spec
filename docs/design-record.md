@@ -4,7 +4,7 @@
 **Companion to:** the SemVer-Trust specification (normative) — canonical
 location `spec/semver-trust.md` in `github.com/semver-trust/spec`
 **This document:** explanatory — rationale, rejected alternatives, review findings, open threads, agent handoff
-**Date:** 2026-07-13 · **Revision:** r12 (see revision history)
+**Date:** 2026-07-13 · **Revision:** r13 (see revision history)
 **Audience:** Both human engineering teams, and future AI agents continuing this work
 
 ---
@@ -186,12 +186,12 @@ The design leans on ecosystem behaviors that were asserted from knowledge, not r
 | GitHub organization `semver-trust` | **Exists** (created July 2026). Pending: `.github` profile repo/README as the org front door. |
 | `spec` repository | **Active**; contains the draft v0.8 normative spec, design record, ADRs through ADR-033, predicate definitions, schemas, conformance vectors, consistency checks, governance files, and the dual-license arrangement. |
 | Normative spec | **Draft v0.8** at `spec/semver-trust.md`; Appendix C–I record the v0.2–v0.8 deltas. |
-| This document | Explanatory companion, revision r12. |
+| This document | Explanatory companion, revision r13. |
 | `TRADEMARK.md` | **Committed**; ecosystem naming, conformance claims, fork naming, and affiliation rules are documented. IP-counsel review remains advisable if traction arrives. |
 | `semver-trust-go` repository | **Implemented through draft v0.3**; consumes digest-pinned conformance artifacts and has published v0.1.0 and v0.2.0 as dogfood. Its legacy release path is not suitable for production claims; draft v0.8 trust-chain and successor-predicate behavior is pending implementation. |
 | Formal JSON Schemas for predicates | **Emitted at v0.1 and draft successor v0.2** under `schemas/`, with Apache 2.0 licensing and closed-object validation. Predicate v0.1 is historical; v0.2 carries the compatibility-critical successor bindings. |
 | Release/review predicate definitions | **Published at v0.1 and v0.2** under `release/` and `review/`; the first DSSE fixture emission occurred in spec PR #16 and remains v0.1 historical evidence. |
-| Conformance suite | **Implemented for draft v0.8**; covers level assignment, qualified review classification, precedence, release intervals/predecessors, policy bootstrap/transitions, authenticated version ancestry, propagation, aggregation, derivation-fail-closed behavior, thresholded decisions, commit signatures, DSSE attestation verification, successor predicate schema registration, and unsigned v0.2 schema-instance fixtures. |
+| Conformance suite | **Implemented for draft v0.8**; covers level assignment, qualified review classification, precedence, release intervals/predecessors, policy bootstrap/transitions, authenticated version ancestry, propagation, aggregation, derivation-fail-closed behavior, thresholded decisions, commit signatures, DSSE attestation verification, successor predicate schema registration, unsigned v0.2 schema-instance fixtures, and signed positive v0.2 DSSE fixtures. |
 | Predicate-type domain | **Registered and wired:** `semver-trust.dev`; v0.1 and v0.2 release/review predicate definitions are present in the Pages source. |
 | Name | **Decided:** SemVer-Trust (ADR-013). |
 | Licensing & control | **Implemented** per ADR-014: CC BY 4.0 prose, Apache 2.0 machine-consumable artifacts, directory-local Apache license copies, and trademark-based conformance control. CLA-vs-DCO remains deferred until the first external contribution. |
@@ -258,6 +258,10 @@ Instructions to any agent (or human) resuming this work:
 22. **Qualified review and canonical actors:** spec #32 produced ADR-031, draft v0.6, canonical actor identity rules, qualified final-revision/final-diff review semantics, review/v0.2 schema refinements before first emission, and review-qualification conformance vectors.
 23. **Threshold and risk-policy separation:** spec #31 produced ADR-032, draft v0.7, threshold as a hard clean-channel accountability gate, a deterministic baseline decision order, threshold-bearing release/v0.2 decisions, and threshold decision vectors.
 24. **Executable derivation retirement:** spec #34 produced ADR-033, draft v0.8, no executable derivation proofs in the portable baseline, fixed-point evidence distinguished from derivation evidence, and fail-closed aggregation vectors for derivation claims.
+25. **Signed successor fixtures:** spec #33 follow-up added signed positive
+    DSSE envelopes for `release/v0.2` and `review/v0.2`, extending the
+    attestation checker's independent skeleton validation to successor
+    predicates while retaining v0.1 historical fixtures.
 
 ---
 
@@ -277,3 +281,4 @@ Instructions to any agent (or human) resuming this work:
 | r10 | 2026-07-12 | Integrated qualified-review hardening: ADR-031, draft v0.6, canonical actor distinctness, active final-revision/final-diff approvals, review/v0.2 schema refinement before emission, review-qualification vectors, and timeline 22. |
 | r11 | 2026-07-13 | Integrated threshold/risk-policy hardening: ADR-032, draft v0.7, hard clean-channel threshold gate, deterministic baseline decision order, threshold-bearing release decisions, threshold vectors, artifact table, and timeline 23. |
 | r12 | 2026-07-13 | Integrated executable-derivation hardening: ADR-033, draft v0.8, derivation claims ignored for portable trust re-leveling, Appendix A update, aggregation vectors, artifact table, and timeline 24. |
+| r13 | 2026-07-13 | Added signed v0.2 successor DSSE fixtures for #33, extended attestation skeleton validation to v0.2 predicates, updated conformance docs, artifact table, and timeline 25. |
