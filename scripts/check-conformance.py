@@ -1699,6 +1699,44 @@ def _payload_schema_validates(path: Path) -> bool:
     return _schema_validates(payload)
 
 
+def _source_evidence_extension_bound(path: Path) -> bool:
+    try:
+        stmt = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return False
+    if stmt.get("predicateType") != "https://semver-trust.dev/release/v0.2":
+        return False
+
+    predicate = stmt.get("predicate", {})
+    ext = predicate.get("extensions", {}).get(
+        "https://semver-trust.dev/extensions/source-evidence/v0.1"
+    )
+    if not isinstance(ext, dict):
+        return False
+
+    interval_source = predicate.get("interval", {}).get("source_identity", {})
+    if ext.get("source_revision") != interval_source:
+        return False
+    repository_id = predicate.get("repository", {}).get("id")
+    if ext.get("repository_resource_uri") != repository_id:
+        return False
+
+    profile = ext.get("profile", {})
+    freshness = ext.get("freshness", {})
+    current_state = freshness.get("current_state", {})
+    required_bound_values = (
+        ext.get("mode"),
+        profile.get("name"),
+        profile.get("version"),
+        profile.get("digest"),
+        ext.get("issuer_roots"),
+        ext.get("evidence"),
+        freshness.get("verification_instant"),
+        current_state.get("digest"),
+    )
+    return all(bool(value) for value in required_bound_values)
+
+
 def check_predicate_v02_instances(vectors: list[dict]) -> None:
     check("predicate-v02-group-nonempty", bool(vectors))
     for vec in vectors:
@@ -1709,6 +1747,12 @@ def check_predicate_v02_instances(vectors: list[dict]) -> None:
             got == vec["expected"]["schema_valid"],
             f"{payload.relative_to(ROOT)} schema_valid={got}",
         )
+        if vec["expected"].get("source_evidence_extension"):
+            check(
+                f"predicate-v02-{vec['id']}-source-evidence-extension",
+                _source_evidence_extension_bound(payload),
+                f"{payload.relative_to(ROOT)} missing bound source-evidence extension shape",
+            )
 
 
 def check_format_gate() -> None:

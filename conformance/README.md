@@ -76,7 +76,10 @@ source-interval, policy, and version-state field required by §8.1.
 `predicate-v0.2.json` adds unsigned positive and negative in-toto Statement
 payload fixtures for the successor schemas. The crypto attestation vectors also
 include signed positive DSSE envelopes for the v0.2 release and review
-successor predicates.
+successor predicates. One positive release fixture carries a populated
+`predicate.extensions["https://semver-trust.dev/extensions/source-evidence/v0.1"]`
+binding so §8.3's source-evidence extension wire shape is exercised by the
+schema-instance suite, not only by the abstract source-evidence oracle.
 
 ## Vector format
 
@@ -404,6 +407,8 @@ false (§1.1 honest degradation).
   authorization, repository/resource matching, subject matching, digest
   algorithm policy, replay vs trusted-issuer mode, freshness, hidden demotion,
   and equivocation.
+- **`predicate-v02`** — validate unsigned v0.2 successor predicate instances,
+  including one positive `release/v0.2` source-evidence extension binding.
 - **`decision`** — run the §6 baseline decision function; assert channel, bump, and the exact
   version string (or, for escalated `inflate` vectors, that the bump escalates).
 
