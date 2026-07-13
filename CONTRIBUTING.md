@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Contributing
 
-SemVer-Trust is in early draft (spec v0.8). Feedback is very welcome —
+SemVer-Trust is in early draft (spec v0.9). Feedback is very welcome —
 please open an issue or discussion.
 
 Pull requests: contribution terms (CLA or DCO) are being finalized and

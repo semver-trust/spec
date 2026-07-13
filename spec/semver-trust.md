@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # SemVer-Trust: Provenance-Scoped Trust Levels for Semantic Versioning
 
-**Draft v0.8**
+**Draft v0.9**
 **Status:** Design draft for review
 **Date:** 2026-07-13
 **Canonical home:** https://semver-trust.dev · https://github.com/semver-trust/spec
@@ -164,7 +164,7 @@ review.
 
 Review facts live outside git (platform PR approvals), so they MUST be captured into the provenance record at merge time:
 
-1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer canonical actors and their classes (human/agent), credential identities, approval verdicts, approval state, the PR/MR reference, covered revisions, final-revision or final-diff approval binding, repository and merge-context identity, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.8 release-conformance claims.
+1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer canonical actors and their classes (human/agent), credential identities, approval verdicts, approval state, the PR/MR reference, covered revisions, final-revision or final-diff approval binding, repository and merge-context identity, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.9 release-conformance claims.
 2. The attestation MUST be signed by the workflow's workload identity and stored per §8.2.
 3. A review is **qualified** for trust classification only if all of the following hold:
    - the verdict is `approved`;
@@ -401,7 +401,7 @@ Determined by the strongest available compatibility evidence, in order of prefer
 ### 6.2 Accountability threshold and blast radius
 
 The active policy's `threshold` is the minimum effective trust level eligible
-for the clean channel. The draft v0.8 baseline threshold is `T2`: before
+for the clean channel. The draft v0.9 baseline threshold is `T2`: before
 empirical validation of T1 efficacy (§12.1), independently agent-reviewed code
 does not satisfy the portable baseline clean profile. Policies MAY choose a
 different threshold, but any conformance claim MUST identify the threshold used.
@@ -472,7 +472,13 @@ tag           = [component-path "/"] "v" (core-version / trust-version)
 
 Examples: `v1.4.0-t1.1`, `auth/v2.0.0-t0.3`, `pkg/common/v0.9.0` (clean).
 
-- The trust identifier occupies SemVer pre-release position, so `v1.4.0-t1.1 < v1.4.0` by SemVer precedence, and default dependency-range resolution in Go modules, npm, and Cargo will not select it. **Low-trust releases are opt-in by construction**, with zero consumer-side tooling.
+- The trust identifier occupies SemVer pre-release position, so
+  `v1.4.0-t1.1 < v1.4.0` by SemVer precedence. This provides native ordering
+  friction, not a complete verification or routing guarantee: dependency
+  resolvers differ, registries expose additional tag/channel controls, and a
+  clean version carries no visible trust level unless the consumer verifies the
+  release attestation. Producers and consumers MUST apply an ecosystem
+  publishing profile (§7.4) before claiming default-resolution behavior.
 - Levels are a fixed single digit. (Lexical ASCII comparison of alphanumeric identifiers would order `t10 < t2`; capping at one digit forecloses the hazard.)
 - Component paths follow the ecosystem's nested-tag convention where one exists (Go nested modules use exactly this `dir/vX.Y.Z` prefix form).
 - **The trust-shaped namespace is reserved.** A pre-release whose first dot-separated identifier matches the trust shape — `t` immediately followed by a level digit — is reserved for this scheme. A well-formed trust suffix is a trust version; a trust-shaped identifier that does *not* satisfy the grammar (a two-digit level, a missing or zero iteration, or a level outside `0`–`3` — e.g. `t10.1`, `t1`, `t1.0`, `t4.1`) is **invalid and MUST be rejected**, never reinterpreted as an ordinary pre-release. Reinterpreting a malformed trust identifier as a plain pre-release would both silently discard intended trust information and open a spoofing surface — a tag that reads as a trust encoding to a human while carrying no verified meaning — so parsing fails closed, exactly as the conformance grammar vectors require. Non-trust pre-releases (`rc.1`, `alpha`, …) carry no trust information and are unaffected: they remain ordinary pre-releases with the trust suffix simply absent.
@@ -500,22 +506,36 @@ Promotion moves a release from the pre-release channel to the clean channel **wi
    is created **on the identical SHA**, with a fresh release attestation citing
    the promotion evidence and superseding the prior decision. A later
    re-evaluation is attestation-only (§7.5).
-3. **Immutable registries:** git and Go modules tolerate two tags on one commit, but npm/PyPI artifacts bake the version string into package metadata, so promotion there means *republication from the identical source SHA*. With reproducible builds the artifact digest matches; without, each artifact carries its own attestation bound to the same source SHA, and the source binding — not the digest match — is the promotion guarantee.
+3. **Immutable registries:** git and Go modules tolerate two tags on one
+   commit, but package artifacts commonly bake the version string into package
+   metadata, so promotion in immutable artifact registries means
+   *republication from the identical source SHA*. A project MAY additionally
+   promise byte-identical artifacts only when its build profile makes the
+   version string external to the artifact or otherwise proves reproducibility
+   across promotion. Otherwise each artifact carries its own attestation bound
+   to the same source SHA, and the source binding — not artifact-digest
+   equality — is the portable promotion guarantee.
 4. **Cascade:** promotion of a dependency MAY trigger re-evaluation of downstream components whose effective trust was floored by it (their attestations pin the dependency, §5.3, making affected components discoverable). Downstream promotion follows the same rule: same SHA, new attestation. This resolves the "auth is stuck in pre-release because pkg/common was T0" case without rebuilding auth.
 5. Demotion (evidence invalidated, e.g., a review attestation revoked) cannot un-publish a clean version; it is expressed by publishing a superseding attestation and, where warranted, a security advisory. This is the standing reason the attestation, not the tag, is the living record (§1.1, Principle 5).
 
-### 7.4 Registry projections
+### 7.4 Ecosystem publishing profiles
 
-The git tag is canonical; registries receive projections:
+The git tag is canonical; registries receive ecosystem-specific publishing
+profiles. A profile constrains only routing and publication behavior. It is not
+trust verification: portable consumers verify the accepted release attestation,
+predicate contract, source binding, predecessor chain, policy/trust bindings,
+and any current-state/freshness mechanism their policy requires.
 
-| Ecosystem | Projection | Notes |
+| Ecosystem | Profile | Notes |
 |---|---|---|
-| Go modules | native | Pre-release identifiers pass through. Build metadata is not an option regardless: the go command requires canonical versions and rejects build-metadata suffixes (only the special `+incompatible` form exists). Nested-module tags align with component paths. |
-| npm | native + dist-tags | `1.4.0-t1.1` is a valid npm version; default ranges exclude pre-releases. Additionally publish under a dist-tag (e.g., `trust-t1`) so `npm install pkg@trust-t1` is ergonomic. |
-| Cargo | native | Pre-release versions excluded from default `^` resolution. |
-| PyPI | lossy | PEP 440 permits only `a`/`b`/`rc` pre-release segments — `1.4.0-t1.1` is not publishable. Project to `1.4.0rc<iteration>` and carry the trust detail exclusively in the attestation. The canonical trust-version remains the git tag. |
+| Go modules | native tag | Pre-release identifiers pass through and release versions are preferred for version queries. Caveat: `latest` selects the highest pre-release when no release version exists for the module path, so a trust pre-release is not universally hidden from default queries. Build metadata is not a portable trust carrier: the go command canonicalizes versions and removes build metadata except special suffixes such as `+incompatible`. Nested-module tags align with component paths. |
+| npm | native version plus explicit dist-tags | `1.4.0-t1.1` is a valid npm version, and npm semver range matching excludes prereleases by default unless the comparator opts into the same core's prerelease set. Publication MUST NOT leave a trust pre-release on the `latest` dist-tag unless the producer intentionally wants ordinary `npm install <pkg>` consumers to receive it; `npm publish --tag <non-latest>` or an equivalent registry operation is required. A dedicated tag such as `trust-t1` MAY make explicit opt-in ergonomic. |
+| Cargo | native version | Cargo dependency requirements and `cargo install` avoid pre-releases unless explicitly requested. Cargo may then upgrade a prerelease dependency to a semver-compatible released version, which matches the promotion path. |
+| Python/PyPI | deferred baseline | PEP 440 cannot publish `1.4.0-t1.1`; it also allows prereleases when they are already installed, explicitly requested, or the only satisfying available candidate. The earlier `rc<iteration>` projection is not injective when trust level changes restart SemVer-Trust iterations, so the portable baseline defines no PyPI projection. A future Python profile MUST either use a globally monotonic projection sequence per core version with trust detail only in the attestation, or define another injective mapping before making publishing claims. |
 
-The PyPI row is the existence proof for Principle 5: any consumer logic that depends on parsing trust out of a version string is non-portable; portable consumers verify attestations.
+The Python/PyPI row is the existence proof for Principle 5: any consumer logic
+that depends on parsing trust out of a registry version string is non-portable;
+portable consumers verify attestations.
 
 ### 7.5 Authenticated version ancestry
 
@@ -677,11 +697,11 @@ review classes) MUST be preserved even though the tag carries only the scalar
 level (§3.2), and `supersedes` links promotion/demotion decisions.
 
 The successor release predicate type is `https://semver-trust.dev/release/v0.2`.
-It is the first release predicate allowed to claim v0.8/v0.7/v0.6/v0.5/v0.4 trust-chain
+It is the first release predicate allowed to claim v0.9/v0.8/v0.7/v0.6/v0.5/v0.4 trust-chain
 conformance. Its schema is `schemas/release-v0.2.json`; the matching review
 successor is `https://semver-trust.dev/review/v0.2`.
 
-A v0.8 release attestation MUST additionally bind the interval mode and resolved
+A v0.9 release attestation MUST additionally bind the interval mode and resolved
 `TO`; the resolved adoption boundary for adoption mode; the cryptographic
 identity of the accepted predecessor attestation for recurring mode; the active
 policy and role-separated trust-material digests that evaluated the interval;
@@ -693,10 +713,11 @@ or explicit no-emission marker, immutable lineage tag raw/peeled object IDs, and
 derived iteration where applicable; the target lineage's accepted interval
 identities and aggregate evidence; and the bootstrap descriptor or predecessor
 that selected the active state. The release decision binding includes the
-claimed bump, semantic floor, accountability threshold, strategy, channel, and
+claimed bump, semantic floor, accountability threshold, strategy, channel,
+ecosystem publishing profile when a registry projection is claimed, and
 supersession identity.
 Predicate v0.1 cannot express those continuity claims and MUST NOT be used to
-claim v0.8/v0.7/v0.6/v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
+claim v0.9/v0.8/v0.7/v0.6/v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
 or fixture expectations and assigns them no v0.4 continuity meaning. Because
 v0.1 did not encode its evaluator/specification profile, v0.2 successor
 attestations MUST bind explicit specification, predicate, evaluator,
@@ -707,7 +728,7 @@ new predicate URI and schema. Version-state identities in `release/v0.2` carry a
 canonicalization profile; v0.2 emission is blocked until that profile is
 implemented by emitters and reproducible by verifiers.
 
-Migration from v0.1 establishes a new authenticated v0.8 chain genesis. The
+Migration from v0.1 establishes a new authenticated v0.9 chain genesis. The
 bootstrap descriptor MAY independently pin a selected legacy `TO` as an included
 adoption boundary and a canonical clean legacy tag as a version predecessor when
 each satisfies §5.2 and §7.5. Neither binding implies the other: the version
@@ -921,7 +942,7 @@ decision selected for superseding re-evaluation:
 4. **Cross-repo propagation.** Effective trust across repository boundaries (internal registries of first-party components) — likely via consuming the dependency's release attestation — is deferred.
 5. **Review-quality signals.** Approval latency, comment depth, and diff coverage of review are measurable but gameable; excluded from v0.1.
 6. **Naming.** *Resolved (v0.2):* the scheme is SemVer-Trust, hosted at `github.com/semver-trust`, with predicate-type URIs bound to `semver-trust.dev` (specification repository ADR-013). The `t` identifier is final. This entry is retained for numbering stability.
-7. **Security-patch velocity vs. channel demotion.** Under `strategy = "demote"`, an under-evidenced security fix lands in the pre-release channel that default resolvers do not select — the scheme can slow patch propagation exactly when speed matters most, and any expedite carve-out is a door an attacker will label "security fix" to walk through. Candidate directions, all unproven: expedited *review* SLAs rather than expedited channels; advisory-linked promotion (a patch promotes when a linked advisory is published by a distinct accountable identity); accepting the tension and documenting emergency response as out of band. This is currently the scheme's strongest known internal counterargument.
+7. **Security-patch velocity vs. channel demotion.** Under `strategy = "demote"`, an under-evidenced security fix lands in a trust pre-release channel that many ecosystem profiles intentionally keep out of ordinary upgrade paths — the scheme can slow patch propagation exactly when speed matters most, and any expedite carve-out is a door an attacker will label "security fix" to walk through. Candidate directions, all unproven: expedited *review* SLAs rather than expedited channels; advisory-linked promotion (a patch promotes when a linked advisory is published by a distinct accountable identity); accepting the tension and documenting emergency response as out of band. This is currently the scheme's strongest known internal counterargument.
 8. **Empirical validation of the trust–outcome link.** The keystone empirical claim — that trust levels correlate with outcome risk — is untested. Retrospective trust profiling of existing repositories against vulnerability and incident history (see the reference-implementation roadmap) is the designated test. A null result does not void the scheme (Principle 6) but would reposition it as accountability infrastructure rather than a risk signal, and should reshape default policy tables.
 9. **Authoritative current state and freshness.** Signatures and predecessor
    links prove an internally consistent chain but cannot prove that a verifier
@@ -1099,6 +1120,21 @@ human               |   T2   |   T2   |   T3**
   rule unless a future accepted proof profile defines stronger evidence.
 - Aggregation conformance vectors now require derivation claims to fail closed
   to raw commit trust in the portable baseline.
+
+## Appendix J: Changes from v0.8
+
+- §7.1 and §7.4 narrow the prerelease-routing claim (ADR-034, superseding
+  ADR-001 and revising ADR-011's registry-projection clause). SemVer-Trust
+  prereleases provide native ordering friction, but resolver behavior is
+  ecosystem-specific and does not replace attestation verification.
+- §7.4 replaces unconditional registry projections with ecosystem publishing
+  profiles for Go modules, npm, Cargo, and Python/PyPI. npm trust prereleases
+  must not be published under `latest` unless ordinary installation is intended;
+  Go and Python prerelease fallback cases are explicit; the portable baseline
+  defers PyPI projection until an injective mapping is accepted.
+- §7.3 clarifies that promotion promises identical source by default. Artifact
+  digest equality is a separate reproducible-build promise, not a consequence
+  of same-source promotion.
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.8",
+  "spec_version": "0.9",
   "description": "Release-interval and predecessor-continuity vectors for SemVer-Trust §5.2 and §10 (ADR-027). Commit arrays are oldest-first topological fixtures; expected.commits asserts interval membership in fixture order.",
   "vectors": [
     {

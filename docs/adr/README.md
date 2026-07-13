@@ -6,7 +6,7 @@ are referenced from the specification's design record and elsewhere.
 
 | ADR | Title | Status |
 |---|---|---|
-| ADR-001 | [Encode trust in SemVer pre-release identifiers, not build metadata](0001-encode-trust-in-semver-pre-release-identifiers-not-build-metadata.md) | Accepted (draft v0.1) |
+| ADR-001 | [Encode trust in SemVer pre-release identifiers, not build metadata](0001-encode-trust-in-semver-pre-release-identifiers-not-build-metadata.md) | Superseded by ADR-034 (2026-07-13) |
 | ADR-002 | [Trust levels count independent accountable humans](0002-trust-levels-count-independent-accountable-humans.md) | Accepted (draft v0.1) |
 | ADR-003 | [Scalar level in the tag; full provenance vector in the attestation](0003-scalar-level-in-the-tag-full-provenance-vector-in-the-attestation.md) | Accepted (draft v0.1) |
 | ADR-004 | [Derivation proofs are the only exception to weakest-link flooring](0004-derivation-proofs-are-the-only-exception-to-weakest-link-flooring.md) | Superseded by ADR-033 (2026-07-13) |
@@ -16,7 +16,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-008 | [Unverifiable ≠ T0: verification failures abort](0008-unverifiable-t0-verification-failures-abort.md) | Accepted (draft v0.1) |
 | ADR-009 | [Promotion: same SHA, new attestation; cascades; supersession over mutation](0009-promotion-same-sha-new-attestation-cascades-supersession-over-mutation.md) | Accepted (draft v0.1) |
 | ADR-010 | [Trust channel generalizes (and should not mix with) rc](0010-trust-channel-generalizes-and-should-not-mix-with-rc.md) | Accepted (draft v0.1) |
-| ADR-011 | [Language-agnostic core; ecosystem plugins; lossy registry projections](0011-language-agnostic-core-ecosystem-plugins-lossy-registry-projections.md) | Accepted (draft v0.1) |
+| ADR-011 | [Language-agnostic core; ecosystem plugins; lossy registry projections](0011-language-agnostic-core-ecosystem-plugins-lossy-registry-projections.md) | Accepted (draft v0.1; registry-projection clause revised by ADR-034) |
 | ADR-012 | [External dependencies out of scope for v0.1](0012-external-dependencies-out-of-scope-for-v0-1.md) | Accepted (draft v0.1) |
 | ADR-013 | [Naming and repository topology](0013-naming-and-repository-topology.md) | Accepted (2026-07-04) |
 | ADR-014 | [Licensing and control strategy](0014-licensing-and-control-strategy.md) | Accepted (2026-07-04) |
@@ -39,6 +39,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-031 | [Qualified review requires final-revision approval and canonical actors](0031-qualified-review-requires-final-revision-approval-and-canonical-actors.md) | Accepted (2026-07-12) |
 | ADR-032 | [Threshold is a hard clean-channel accountability gate](0032-threshold-is-a-hard-clean-channel-accountability-gate.md) | Accepted (2026-07-13) |
 | ADR-033 | [Executable derivation proofs are out of the portable baseline](0033-executable-derivation-proofs-are-out-of-the-portable-baseline.md) | Accepted (2026-07-13) |
+| ADR-034 | [Ecosystem publishing profiles constrain resolver-routing claims](0034-ecosystem-publishing-profiles-constrain-resolver-routing-claims.md) | Accepted (2026-07-13) |
 
 ## Adding an ADR
 

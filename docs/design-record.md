@@ -4,21 +4,21 @@
 **Companion to:** the SemVer-Trust specification (normative) — canonical
 location `spec/semver-trust.md` in `github.com/semver-trust/spec`
 **This document:** explanatory — rationale, rejected alternatives, review findings, open threads, agent handoff
-**Date:** 2026-07-13 · **Revision:** r13 (see revision history)
+**Date:** 2026-07-13 · **Revision:** r14 (see revision history)
 **Audience:** Both human engineering teams, and future AI agents continuing this work
 
 ---
 
 ## 1. Executive summary
 
-This project retires `go-semver` (a Go utility for managing git tags with semantic versioning) and relaunches the concept for AI-driven development. The core idea: **when agents author a growing share of production code, a version number's implicit claim — "safe drop-in replacement" — needs explicit, verifiable evidence behind it.** SemVer-Trust (working name) defines trust levels T0–T3 derived from cryptographically verified provenance, aggregates them per release using weakest-link flooring with transitive propagation through the workspace dependency graph, encodes the result in SemVer pre-release identifiers so that low-trust releases are *opt-in by construction*, and publishes signed in-toto attestations as the portable, living record.
+This project retires `go-semver` (a Go utility for managing git tags with semantic versioning) and relaunches the concept for AI-driven development. The core idea: **when agents author a growing share of production code, a version number's implicit claim — "safe drop-in replacement" — needs explicit, verifiable evidence behind it.** SemVer-Trust (working name) defines trust levels T0–T3 derived from cryptographically verified provenance, aggregates them per release using weakest-link flooring with transitive propagation through the workspace dependency graph, encodes the result in SemVer pre-release identifiers so that low-trust releases sort below the corresponding clean release and can be routed through ecosystem-specific opt-in channels, and publishes signed in-toto attestations as the portable, living record.
 
 Two sentences carry the entire design; everything else is derivation:
 
 1. **A version bump is a compatibility claim; a trust level is the strength of evidence behind the claim.**
 2. **Trust levels measure attested accountability, not keystrokes.**
 
-Current state: **spec draft v0.8** is published at `spec/semver-trust.md`;
+Current state: **spec draft v0.9** is published at `spec/semver-trust.md`;
 release/review predicate definitions, schemas, core and cryptographic
 conformance vectors, and consistency checks are committed. The official Go
 implementation consumes the vendored v0.3 conformance contract and has
@@ -30,8 +30,10 @@ version-ancestry vectors; v0.5 assigns v0.2 release/review successor predicates
 with explicit profile identity; v0.6 requires qualified final-revision review
 and canonical actor distinctness; v0.7 defines threshold as a hard
 clean-channel accountability gate and separates accountability from blast/risk
-policy; v0.8 removes executable derivation proofs from the portable baseline.
-Decisions are recorded through ADR-033.
+policy; v0.8 removes executable derivation proofs from the portable baseline;
+v0.9 replaces unconditional resolver-routing claims with ecosystem publishing
+profiles and defers non-injective PyPI projection. Decisions are recorded
+through ADR-034.
 
 ## 2. Project origin and intent
 
@@ -72,7 +74,7 @@ status.
 
 | ADR | Title |
 |---|---|
-| ADR-001 | Encode trust in SemVer pre-release identifiers, not build metadata |
+| ADR-001 | Encode trust in SemVer pre-release identifiers, not build metadata (superseded by ADR-034) |
 | ADR-002 | Trust levels count independent accountable humans |
 | ADR-003 | Scalar level in the tag; full provenance vector in the attestation |
 | ADR-004 | Derivation proofs are the only exception to weakest-link flooring (superseded by ADR-033) |
@@ -82,7 +84,7 @@ status.
 | ADR-008 | Unverifiable ≠ T0: verification failures abort |
 | ADR-009 | Promotion: same SHA, new attestation; cascades; supersession over mutation |
 | ADR-010 | Trust channel generalizes (and should not mix with) rc |
-| ADR-011 | Language-agnostic core; ecosystem plugins; lossy registry projections |
+| ADR-011 | Language-agnostic core; ecosystem plugins; lossy registry projections (registry-projection clause revised by ADR-034) |
 | ADR-012 | External dependencies out of scope for v0.1 |
 | ADR-013 | Naming and repository topology |
 | ADR-014 | Licensing and control strategy |
@@ -105,6 +107,7 @@ status.
 | ADR-031 | Qualified review requires final-revision approval and canonical actors |
 | ADR-032 | Threshold is a hard clean-channel accountability gate |
 | ADR-033 | Executable derivation proofs are out of the portable baseline |
+| ADR-034 | Ecosystem publishing profiles constrain resolver-routing claims |
 
 ## 5. Design review findings (QA record)
 
@@ -164,15 +167,15 @@ The design leans on ecosystem behaviors that were asserted from knowledge, not r
 
 | # | Fact relied upon | Load-bearing for |
 |---|---|---|
-| 1 | Go modules reject build-metadata suffixes; only `+incompatible` exists; nested-module tags use `dir/vX.Y.Z` | ADR-001, ADR-006 |
-| 2 | Go modules / npm / Cargo exclude pre-release versions from default range resolution | ADR-001 (opt-in-by-construction) |
-| 3 | PEP 440 pre-release segments limited to `a`/`b`/`rc` | ADR-011, P5 |
+| 1 | Go modules reject build-metadata suffixes; only special suffixes such as `+incompatible` survive canonicalization; nested-module tags use `dir/vX.Y.Z` | ADR-034, ADR-006 |
+| 2 | Go modules / npm / Cargo / Python resolver and publication behavior is ecosystem-specific: Go `latest` may fall back to prereleases, npm publication must avoid `latest` for trust prereleases unless ordinary install is intended, Cargo excludes prereleases unless requested, and PEP 440 allows prerelease fallback | ADR-034 |
+| 3 | PEP 440 pre-release segments cannot carry the SemVer-Trust `-tN.I` identifier | ADR-034, P5 |
 | 4 | SemVer 2.0.0 precedence: numeric identifiers < alphanumeric; alphanumerics compare ASCII-lexically; pre-release < release | ADR-010 (verified mechanically against spec rules, §5 above) |
 | 5 | `golang.org/x/exp/apidiff`, `cargo-semver-checks`, `japicmp`, API Extractor exist and detect public-surface breakage | ADR-005, ADR-011 |
 | 6 | sigstore gitsign (keyless commit signing), keyless workload identities via OIDC, Rekor transparency log | spec §4.2, §8.2 |
 | 7 | in-toto Statement v1 (`https://in-toto.io/Statement/v1`) as the attestation envelope | spec §8 |
 | 8 | Claude Code emits `Co-authored-by` trailers for agent-assisted commits | spec §4.1 |
-| 9 | npm dist-tags can reference any published version, including pre-releases | ADR-011 |
+| 9 | npm dist-tags can reference any published version, including pre-releases; `npm publish` sets `latest` unless `--tag` or equivalent registry handling is used | ADR-034 |
 | 10 | GitHub's new-repo license picker includes only CC0 among CC licenses; CC BY 4.0 must be added manually (**verified against the live UI, July 2026** — corrected an incorrect assertion made during discussion) | ADR-014 execution |
 | 11 | GitHub license detection (Licensee) recognizes verbatim CC BY 4.0 text and badges it; dual-license repos surface a single badge or "View license" | ADR-014 execution |
 | 12 | sigstore keyless signing certificates are short-lived by design; verification of historical signatures depends on transparency-log inclusion proofs | ADR-018, conformance fixture design |
@@ -184,14 +187,14 @@ The design leans on ecosystem behaviors that were asserted from knowledge, not r
 | Artifact | Status |
 |---|---|
 | GitHub organization `semver-trust` | **Exists** (created July 2026). Pending: `.github` profile repo/README as the org front door. |
-| `spec` repository | **Active**; contains the draft v0.8 normative spec, design record, ADRs through ADR-033, predicate definitions, schemas, conformance vectors, consistency checks, governance files, and the dual-license arrangement. |
-| Normative spec | **Draft v0.8** at `spec/semver-trust.md`; Appendix C–I record the v0.2–v0.8 deltas. |
-| This document | Explanatory companion, revision r13. |
+| `spec` repository | **Active**; contains the draft v0.9 normative spec, design record, ADRs through ADR-034, predicate definitions, schemas, conformance vectors, consistency checks, governance files, and the dual-license arrangement. |
+| Normative spec | **Draft v0.9** at `spec/semver-trust.md`; Appendix C–J record the v0.2–v0.9 deltas. |
+| This document | Explanatory companion, revision r14. |
 | `TRADEMARK.md` | **Committed**; ecosystem naming, conformance claims, fork naming, and affiliation rules are documented. IP-counsel review remains advisable if traction arrives. |
-| `semver-trust-go` repository | **Implemented through draft v0.3**; consumes digest-pinned conformance artifacts and has published v0.1.0 and v0.2.0 as dogfood. Its legacy release path is not suitable for production claims; draft v0.8 trust-chain and successor-predicate behavior is pending implementation. |
+| `semver-trust-go` repository | **Implemented through draft v0.3**; consumes digest-pinned conformance artifacts and has published v0.1.0 and v0.2.0 as dogfood. Its legacy release path is not suitable for production claims; draft v0.9 trust-chain, successor-predicate, and publishing-profile behavior is pending implementation. |
 | Formal JSON Schemas for predicates | **Emitted at v0.1 and draft successor v0.2** under `schemas/`, with Apache 2.0 licensing and closed-object validation. Predicate v0.1 is historical; v0.2 carries the compatibility-critical successor bindings. |
 | Release/review predicate definitions | **Published at v0.1 and v0.2** under `release/` and `review/`; the first DSSE fixture emission occurred in spec PR #16 and remains v0.1 historical evidence. |
-| Conformance suite | **Implemented for draft v0.8**; covers level assignment, qualified review classification, precedence, release intervals/predecessors, policy bootstrap/transitions, authenticated version ancestry, propagation, aggregation, derivation-fail-closed behavior, thresholded decisions, commit signatures, DSSE attestation verification, successor predicate schema registration, unsigned v0.2 schema-instance fixtures, and signed positive v0.2 DSSE fixtures. |
+| Conformance suite | **Implemented for draft v0.8**; covers level assignment, qualified review classification, precedence, release intervals/predecessors, policy bootstrap/transitions, authenticated version ancestry, propagation, aggregation, derivation-fail-closed behavior, thresholded decisions, commit signatures, DSSE attestation verification, successor predicate schema registration, unsigned v0.2 schema-instance fixtures, and signed positive v0.2 DSSE fixtures. Draft v0.9 publishing profiles are documented but not yet covered by adversarial registry-projection vectors. |
 | Predicate-type domain | **Registered and wired:** `semver-trust.dev`; v0.1 and v0.2 release/review predicate definitions are present in the Pages source. |
 | Name | **Decided:** SemVer-Trust (ADR-013). |
 | Licensing & control | **Implemented** per ADR-014: CC BY 4.0 prose, Apache 2.0 machine-consumable artifacts, directory-local Apache license copies, and trademark-based conformance control. CLA-vs-DCO remains deferred until the first external contribution. |
@@ -222,7 +225,7 @@ Instructions to any agent (or human) resuming this work:
 
 1. **Document precedence:** the spec — `spec/semver-trust.md` in `github.com/semver-trust/spec` — is normative. This document explains *why*; where they conflict, the spec wins and the conflict should be reported as a defect.
 2. **Do not re-litigate rejected alternatives** (ADR "Rejected" entries) without *new evidence or a changed requirement*. In particular: build-metadata encoding (ADR-001), de-minimis exemptions (P3/ADR-033), unverifiable→T0 (ADR-008), and inflation-as-only-strategy (ADR-005) were each rejected for stated reasons that have not changed.
-3. **Change protocol:** decisions change by *superseding* — create `docs/adr/NNNN-slug.md` with the next number and a `Supersedes:` field; never edit an accepted ADR's Decision/Rationale/Rejected content in place (the sole permitted edit to a superseded file is its Status line, set to `Superseded by ADR-NNN`). Update the `docs/adr/README.md` index. Mirror material changes into the spec with a version bump of the spec itself. Predicate v0.1 remains historical and cannot carry draft v0.8 interval, policy, version-state, qualified-review, threshold-decision, or derivation-fail-closed claims; do not mutate it. Successor predicate changes after first emission require a new predicate URI when validation or interpretation changes.
+3. **Change protocol:** decisions change by *superseding* — create `docs/adr/NNNN-slug.md` with the next number and a `Supersedes:` field; never edit an accepted ADR's Decision/Rationale/Rejected content in place (the sole permitted edit to a superseded file is its Status line, set to `Superseded by ADR-NNN`). Update the `docs/adr/README.md` index. Mirror material changes into the spec with a version bump of the spec itself. Predicate v0.1 remains historical and cannot carry draft v0.9 interval, policy, version-state, qualified-review, threshold-decision, derivation-fail-closed, or publishing-profile claims; do not mutate it. Successor predicate changes after first emission require a new predicate URI when validation or interpretation changes.
 4. **Before implementing anything**, re-verify §6 facts against current ecosystem documentation; several postdate nothing but all predate you.
 5. **Terminology discipline:** use the spec's §2 terms exactly (own trust vs effective trust; scope vs component; channel; accountable human). Drift here has already been the source of one caught bug (§5.8).
 6. **Honesty clauses are load-bearing:** P2 (accountability, not keystrokes) and P4 (degrade honestly) are commitments, not caveats. Any feature that quietly claims more than the evidence supports — e.g., inferring authorship the signatures can't prove, or waiving evidence where a differ is missing — violates the design's core defense against being discredited.
@@ -236,7 +239,7 @@ Instructions to any agent (or human) resuming this work:
 
 1. **Naming exploration** for a `go-semver` successor "for the AI age" → surfaced trust/provenance-centric candidates; deferred.
 2. **Founding concept** (Brad): semver-encoded trust levels; AI-authored large-blast-radius changes as possibly "breaking."
-3. **Design session:** four enforcement points (commit / merge / release / consume + attestation store); trust taxonomy v1; weakest-link flooring; reproducibility exception for generated code; pre-release-identifier encoding discovered as the key trick (opt-in by construction; Go build-metadata blocker); bump-claim reframing (P1); identity-laundering limit → accountability principle (P2).
+3. **Design session:** four enforcement points (commit / merge / release / consume + attestation store); trust taxonomy v1; weakest-link flooring; reproducibility exception for generated code; pre-release-identifier encoding discovered as the key trick (ordering/routing friction; Go build-metadata blocker); bump-claim reframing (P1); identity-laundering limit → accountability principle (P2).
 4. **Generalization requirements** (Brad): non-OpenAPI, non-Go, path-scoped monorepo trust → derivation proofs (ADR-004), plugin architecture (ADR-011), transitive propagation with the auth/billing/common worked example (ADR-006), meta-paths (ADR-007).
 5. **Spec drafting with review** ("double-check your work"): four design-level fixes pre-draft, mechanical verification post-draft, one arithmetic bug caught and fixed (§5).
 6. **This document** (r1).
@@ -262,6 +265,11 @@ Instructions to any agent (or human) resuming this work:
     DSSE envelopes for `release/v0.2` and `review/v0.2`, extending the
     attestation checker's independent skeleton validation to successor
     predicates while retaining v0.1 historical fixtures.
+26. **Ecosystem publishing profiles:** spec #30 produced ADR-034 and draft
+    v0.9, replacing unconditional prerelease/default-resolver claims with
+    ecosystem profiles for Go modules, npm, Cargo, and Python/PyPI. PyPI
+    projection is deferred until an injective mapping exists, and same-source
+    promotion is separated from artifact-digest equality.
 
 ---
 
@@ -282,3 +290,4 @@ Instructions to any agent (or human) resuming this work:
 | r11 | 2026-07-13 | Integrated threshold/risk-policy hardening: ADR-032, draft v0.7, hard clean-channel threshold gate, deterministic baseline decision order, threshold-bearing release decisions, threshold vectors, artifact table, and timeline 23. |
 | r12 | 2026-07-13 | Integrated executable-derivation hardening: ADR-033, draft v0.8, derivation claims ignored for portable trust re-leveling, Appendix A update, aggregation vectors, artifact table, and timeline 24. |
 | r13 | 2026-07-13 | Added signed v0.2 successor DSSE fixtures for #33, extended attestation skeleton validation to v0.2 predicates, updated conformance docs, artifact table, and timeline 25. |
+| r14 | 2026-07-13 | Integrated ecosystem publishing profile hardening: ADR-034, draft v0.9, narrowed resolver-routing claims, deferred non-injective PyPI projection, clarified same-source promotion, artifact table, external-facts table, and timeline 26. |

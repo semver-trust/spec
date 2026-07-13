@@ -1,6 +1,6 @@
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.8",
+  "spec_version": "0.9",
   "description": "Release-decision kernel vectors for SemVer-Trust (spec/semver-trust.md §6.1-§6.4, §7.1, Appendix A), encoding the §6.4 baseline decision table. Version base and trust-suffix iteration inputs are authenticated/derived §7.5 intermediates, never caller authority; version-ancestry.json tests their selection. Expected: the channel, the final bump (max of claim and semantic floor — the floor is honored unconditionally), and the exact §7.1 tag. The threshold input is a hard clean-channel accountability gate evaluated before the blast/differ table. 'Differ proof required' cells resolve to pre-release when no differ is available (§1.1 honest degradation). Under 'inflate', vectors assert whether the bump escalates ('escalate'); the escalation target (MINOR vs MAJOR) is a policy choice per §6.3, so escalated vectors carry null bump/version.",
   "vectors": [
     {

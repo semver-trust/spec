@@ -12,7 +12,7 @@ The home of the SemVer-Trust specification and its supporting artifacts:
 
 | Path | Role | License |
 |---|---|---|
-| `spec/semver-trust.md` | **Normative specification** (draft v0.8) | CC BY 4.0 |
+| `spec/semver-trust.md` | **Normative specification** (draft v0.9) | CC BY 4.0 |
 | `docs/design-record.md` | Design record: rationale, QA record, handoff contract | CC BY 4.0 |
 | `docs/adr/` | Decision records, one file per ADR, indexed at `docs/adr/README.md` | CC BY 4.0 |
 | `release/`, `review/` | Predicate-type definitions | CC BY 4.0 |

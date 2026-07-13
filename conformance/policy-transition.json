@@ -1,6 +1,6 @@
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.8",
+  "spec_version": "0.9",
   "description": "Bootstrap and previous-policy transition vectors for SemVer-Trust §5.4 and §10 (ADR-028). Policies are immutable fixtures referenced by vectors; the active policy evaluates the current interval and the candidate activates only after success.",
   "policies": {
     "policy-a": {
