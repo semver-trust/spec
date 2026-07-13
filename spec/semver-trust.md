@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # SemVer-Trust: Provenance-Scoped Trust Levels for Semantic Versioning
 
-**Draft v0.5**
+**Draft v0.6**
 **Status:** Design draft for review
 **Date:** 2026-07-12
 **Canonical home:** https://semver-trust.dev · https://github.com/semver-trust/spec
@@ -42,6 +42,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT, and MAY are to be interpreted 
 | **Attestation** | A signed [in-toto Statement](https://in-toto.io) binding a subject (commit SHA, tag, artifact digest) to a predicate (facts about provenance, review, evidence, or a release decision). |
 | **Bootstrap descriptor** | Out-of-band chain-genesis trust input binding the initial policy, trust material, release-interval state, and version-ancestry state (§5.4, §7.5). |
 | **Candidate policy** | The policy present at `TO`; on a recurring release it activates only after the active policy has accepted the release (§5.4). |
+| **Canonical actor** | The stable policy-bound identity for one accountable person or agent after mapping credentials, platform accounts, aliases, and key rotations (§4.2, §9). |
 | **Component** | A releasable unit within a repository, identified by a scope and released under a (possibly path-prefixed) tag. |
 | **Derivation** | A deterministic transformation from declared input paths to declared output paths via a pinned command. |
 | **Effective trust** | A component's trust level after transitive propagation through its internal dependency graph (§5.3). |
@@ -67,13 +68,16 @@ A trust level is a scalar `T0`–`T3` counting **independent accountable humans*
 | **T0** | No accountable human. Agent-authored (or mixed/ambiguous authorship) with no independent review. | Fully autonomous. |
 | **T1** | No accountable human, but independently agent-reviewed (§3.3). | Autonomous with machine corroboration. |
 | **T2** | Exactly one accountable human, in either role. | One human stands behind it. |
-| **T3** | Two distinct accountable humans: verified author identity ≠ verified reviewer identity. | Authored and independently reviewed by different humans. |
+| **T3** | Two distinct accountable humans: canonical human author actor ≠ canonical human reviewer actor. | Authored and independently reviewed by different humans. |
 
 Levels are an accountability ordering, not a risk ordering (Principle 6, §1.1): policy maps levels plus evidence to risk; the levels themselves claim only the count of independent accountable humans.
+For T3, "distinct" means distinct canonical human actors under the issuer's
+active actor policy. The level does not prove natural-person uniqueness beyond
+that policy, review diligence, non-collusion, or review quality.
 
 ### 3.2 Level assignment (normative)
 
-Per-commit levels are assigned from the full authorship × review matrix. Authorship class is determined by the commit's verified signer identity class (§4.2) combined with provenance trailers (§4.1); review class by merge-time attestations (§4.3).
+Per-commit levels are assigned from the full authorship × review matrix. Authorship class is determined by the commit's verified signer identity class (§4.2) combined with provenance trailers (§4.1); review class by qualified merge-time attestations (§4.3).
 
 | Authorship | Review | Level |
 |---|---|---|
@@ -85,13 +89,14 @@ Per-commit levels are assigned from the full authorship × review matrix. Author
 | human | agent (independent) | **T2** |
 | agent | human | **T2** |
 | mixed / ambiguous | human | **T2** |
-| human | human (distinct identity) | **T3** |
+| human | human (distinct canonical actor) | **T3** |
 
 Notes:
 
 - *Ambiguous* means the signer identity class and the provenance trailers conflict, or required trailers are absent under a policy that mandates them. Ambiguity MUST floor to the agent-authored row — unverifiable claims of human authorship are treated as absent.
-- The self-review exclusion prevents one human from counting twice, never from counting once: a human reviewing their own *human-authored* commit adds no second human (T3 requires distinct verified identities), but for agent-, mixed-, or ambiguous-authored commits — where no human author is counted — a signed human review adds the first accountable human even when the reviewer is the commit's signer (agent + human = T2; spec repository ADR-025). Anything else would punish the honest `Provenance: agent` trailer: omitting it would classify the commit human-authored and reach T2 directly.
+- The self-review exclusion prevents one human from counting twice, never from counting once: a human reviewing their own *human-authored* commit adds no second human (T3 requires distinct canonical human actors), but for agent-, mixed-, or ambiguous-authored commits — where no human author is counted — a qualified human review adds the first accountable human even when the reviewer maps to the commit signer's canonical actor (agent + human = T2; spec repository ADR-025). Anything else would punish the honest `Provenance: agent` trailer: omitting it would classify the commit human-authored and reach T2 directly.
 - Multiple unverified co-authors (e.g., `Co-authored-by:` trailers without signatures) do not raise a commit above T2. Only signature-verified or platform-attested identities count.
+- Distinctness is evaluated on canonical actors, not raw credentials. One person using two keys, two platform accounts, or a rotated credential still counts as one accountable human when those credentials map to the same canonical actor.
 - The scalar is deliberately lossy: `human + none` and `agent + human` both map to T2. Policies that need the distinction MUST consume the full **provenance vector** in the attestation (§8.1), which preserves authorship and review classes separately. The scalar exists for tag encoding and precedence; the vector exists for policy.
 
 ### 3.3 Independent agent review (T1)
@@ -99,10 +104,13 @@ Notes:
 An agent review qualifies as *independent* only if all of the following hold:
 
 1. The reviewing agent runs in a separate execution context with no shared conversational or working state with the authoring agent.
-2. The reviewer's identity (workload identity, §4.2) differs from the author's identity.
-3. The review produces a signed review attestation naming the commit SHA(s), the reviewing agent/model, and a verdict.
+2. The reviewer's canonical agent actor (§4.2) differs from the author's canonical actor.
+3. The review produces a signed qualified review attestation (§4.3) with verdict `approved`, bound to the final revision or final diff that was merged, naming the commit SHA(s), reviewing agent/model, and evidence of the separate execution context.
 
 Implementations SHOULD prefer a different model family for the reviewer. This spec makes no empirical claim that T1 review approaches human review efficacy — self-preference bias in model-reviewing-model settings is an open research question. T1 exists as a distinct rung so that policy can price it separately from both T0 and T2.
+The separate-execution evidence recorded for T1 is issuer-asserted unless a
+source-control or workload profile gives it stronger, independently verifiable
+semantics; consumers SHOULD weight T1 corroboration accordingly.
 
 ## 4. Commit-level provenance
 
@@ -139,16 +147,35 @@ Every commit on a protected branch MUST be signed. The **identity class** of the
 - **Human identities:** SSH or GPG keys enrolled in an allowed-signers registry, or sigstore *gitsign* certificates whose OIDC identity maps to a person in the identity map (§9).
 - **Agent identities:** machine identities — CI workload identities (e.g., OIDC tokens issued to a pipeline), bot accounts, or dedicated agent service identities — verified via sigstore keyless signing or registered machine keys. Agents operating in CI MUST commit under agent identities, never under a human's credentials.
 
+Credential identities are evidence, not the unit of accountability. The active
+policy MUST map every credential identity and every platform review account that
+can affect trust to exactly one canonical actor, and the actor's class (human or
+agent) is the class used by §3.2. Key rotation and account aliases are represented
+by multiple credentials mapping to the same canonical actor. A verifier MUST NOT
+treat two raw credentials as two accountable humans unless the active actor map
+binds them to two distinct canonical human actors. An unmapped credential or
+ambiguous many-actor mapping is unverifiable for trust purposes and MUST abort
+when the credential is needed to classify a protected-branch commit or counted
+review.
+
 **The identity-laundering limit (normative honesty clause).** When a human runs an agent locally and commits under their own key, the scheme cannot detect it. Such commits classify as human-authored *as an accountability assertion by the signer* (Principle 2, §1.1). Organizations SHOULD state this interpretation in contributor policy, SHOULD require agents to emit provenance trailers even in local use, and MAY audit via spot review. The residual risk is accepted and documented in the threat model (§11) rather than hidden.
 
 ### 4.3 Merge-time review attestation
 
 Review facts live outside git (platform PR approvals), so they MUST be captured into the provenance record at merge time:
 
-1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer identities and their classes (human/agent), approval verdicts, the PR/MR reference, covered revisions, final-revision approval state, canonical actor identities, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.5 release-conformance claims.
+1. At merge, a trusted workflow (CI or merge queue) generates an in-toto attestation with predicate type `https://semver-trust.dev/review/v0.2` whose subjects are the merged commit SHAs, recording: reviewer canonical actors and their classes (human/agent), credential identities, approval verdicts, approval state, the PR/MR reference, covered revisions, final-revision or final-diff approval binding, repository and merge-context identity, merge strategy, and the verifier profiles used. Historical `review/v0.1` attestations remain verifiable under frozen legacy semantics, but they are not sufficient for v0.6 release-conformance claims.
 2. The attestation MUST be signed by the workflow's workload identity and stored per §8.2.
-3. **Merge strategies:** squash and rebase merges rewrite authorship and destroy per-commit provenance. Repositories MUST either (a) forbid squash/rebase merges on protected branches, or (b) ensure the merge-time attestation records the pre-squash commit provenance so the resulting single commit can be classified from attested facts.
-4. **Merge commits themselves:** a merge commit with a non-empty diff (conflict resolution) introduces authored changes. It MUST be classified like any other commit — the resolver is its author; the review attestation covering the PR does not automatically cover novel conflict-resolution hunks unless the reviewer re-approved after resolution.
+3. A review is **qualified** for trust classification only if all of the following hold:
+   - the verdict is `approved`;
+   - the reviewer credential maps under the active actor profile to exactly one canonical actor with the recorded class;
+   - the approval was active at merge: not withdrawn, dismissed, stale, superseded by a later `changes_requested` verdict from the same actor, or otherwise marked ineffective by the source-control platform;
+   - the approval covers the final reviewed source revision set or an explicitly recorded final diff, and any post-approval change to the source, target, conflict-resolution content, or merge result either preserves that exact approved diff under the source-control profile or requires re-approval;
+   - the review attestation binds the stable repository identity, change identity, target branch or equivalent merge context, source revisions, target revision, merge strategy, result revision, evaluator profile, actor-identity profile, source-control profile, and verification instant used to make the effective-at-merge decision; and
+   - for agent review, the attestation includes evidence that the reviewing agent ran in a separate execution context with no shared conversational or working state with the authoring agent (§3.3).
+4. Non-qualified reviews — including comments, `changes_requested`, stale approvals, withdrawn or dismissed approvals, wrong-revision approvals, and approvals by credentials that collapse to the same canonical actor when a distinct actor is required — MUST NOT raise a commit's trust level. If policy requires such a review for a protected merge or release claim, the unmet requirement is a verification failure, not a demotion.
+5. **Merge strategies:** squash and rebase merges rewrite authorship and destroy per-commit provenance. Repositories MUST either (a) forbid squash/rebase merges on protected branches, or (b) ensure the merge-time attestation records the pre-rewrite source revisions and provenance plus the deterministic source-control binding from those revisions to the result revision, so the resulting commit can be classified from attested facts. A squash or rebase approval qualifies only when the approved pre-rewrite content is exactly the content that produced the recorded result revision under the source-control profile.
+6. **Merge commits themselves:** a merge commit with a non-empty diff (conflict resolution) introduces authored changes. It MUST be classified like any other commit — the resolver is its author; the review attestation covering the PR does not automatically cover novel conflict-resolution hunks unless the reviewer re-approved after resolution.
 
 ### 4.4 Derivation proofs
 
@@ -599,11 +626,11 @@ review classes) MUST be preserved even though the tag carries only the scalar
 level (§3.2), and `supersedes` links promotion/demotion decisions.
 
 The successor release predicate type is `https://semver-trust.dev/release/v0.2`.
-It is the first release predicate allowed to claim v0.5/v0.4 trust-chain
+It is the first release predicate allowed to claim v0.6/v0.5/v0.4 trust-chain
 conformance. Its schema is `schemas/release-v0.2.json`; the matching review
 successor is `https://semver-trust.dev/review/v0.2`.
 
-A v0.5 release attestation MUST additionally bind the interval mode and resolved
+A v0.6 release attestation MUST additionally bind the interval mode and resolved
 `TO`; the resolved adoption boundary for adoption mode; the cryptographic
 identity of the accepted predecessor attestation for recurring mode; the active
 policy and role-separated trust-material digests that evaluated the interval;
@@ -616,21 +643,18 @@ derived iteration where applicable; the target lineage's accepted interval
 identities and aggregate evidence; and the bootstrap descriptor or predecessor
 that selected the active state.
 Predicate v0.1 cannot express those continuity claims and MUST NOT be used to
-claim v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
+claim v0.6/v0.5/v0.4 release conformance. This draft does not change existing v0.1 bytes
 or fixture expectations and assigns them no v0.4 continuity meaning. Because
 v0.1 did not encode its evaluator/specification profile, v0.2 successor
 attestations MUST bind explicit specification, predicate, evaluator,
 repository-identity, graph, policy, actor-identity where applicable, and
 verification-time profiles. Successor schemas are closed except for declared
 extension maps; any change that alters validation or interpretation requires a
-new predicate URI and schema. Predicate v0.2 review emission remains blocked
-until qualified-review and canonical-actor semantics are settled (§12); if that
-work needs facts v0.2 cannot express, a new `review/v0.3` predicate is required.
-Version-state identities in `release/v0.2` carry a digest plus a
+new predicate URI and schema. Version-state identities in `release/v0.2` carry a digest plus a
 canonicalization profile; v0.2 emission is blocked until that profile is
 implemented by emitters and reproducible by verifiers.
 
-Migration from v0.1 establishes a new authenticated v0.5 chain genesis. The
+Migration from v0.1 establishes a new authenticated v0.6 chain genesis. The
 bootstrap descriptor MAY independently pin a selected legacy `TO` as an included
 adoption boundary and a canonical clean legacy tag as a version predecessor when
 each satisfies §5.2 and §7.5. Neither binding implies the other: the version
@@ -699,6 +723,16 @@ oidc_issuers     = ["https://token.actions.githubusercontent.com"]
 subject_patterns = ["repo:acme/platform:*"]
 bot_accounts     = ["release-bot@acme.dev"]
 
+[identity.actor.alice]
+class       = "human"
+credentials = ["ssh:SHA256:alice-old", "ssh:SHA256:alice-current"]
+accounts    = ["github:alice", "github:alice-work"]
+
+[identity.actor.review-bot]
+class       = "agent"
+credentials = ["oidc:repo:acme/platform:environment:review"]
+accounts    = ["github:acme-review-bot"]
+
 [trailers]
 require = true          # commits on protected branches must carry Provenance:
 
@@ -712,6 +746,11 @@ coverage_min_changed_lines  = 0.70
 [registry.npm]
 dist_tag_prefix = "trust-"
 ```
+
+`[identity.actor.<id>]` entries define the canonical actor map used by §3.2 and
+§4.3. A credential or platform account MAY appear in only one actor entry in the
+active policy. Multiple credentials under one actor represent aliases or key
+rotation, not multiple accountable humans.
 
 `[identity.human] gpg_keyring` is optional and names an armored OpenPGP public
 keyring for GPG-signed commits — the OpenPGP counterpart to the SSH
@@ -806,6 +845,7 @@ decision selected for superseding re-evaluation:
 |---|---|---|
 | Forged provenance trailers | Trailers advisory; identity class from verified signature governs; conflicts floor to agent (§3.2, §4.1) | Low |
 | Identity laundering (agent under human key) | Accountability semantics stated normatively (§4.2); agent trailers required by policy; CI agents forced onto machine identities; spot audits | **Accepted & documented** — T2/T3 mean "human stands behind it," not "human typed it" |
+| Actor-map laundering | Actor map is policy/trust material selected by bootstrap or accepted predecessor state; meta-path and policy-transition rules protect actor-map changes (§4.2, §5.4, §9) | T3 means two distinct canonical human actors under the issuer's identity policy, not independently proven natural-person distinctness or non-collusion |
 | Review rubber-stamping | Evidence ceiling still applies (differ proofs, coverage); distinct-identity requirement for T3; audit trails in attestations | Moderate — review *quality* is out of scope by design |
 | Payload hidden in "trivial" commit | No de-minimis exception (§5.1); only verified derivations bypass flooring | Low |
 | Risk laundering via shared libs | Transitive propagation over the workspace graph (§5.3) | Low |
@@ -864,7 +904,7 @@ agent               |   T0   |   T1   |   T2
 mixed / ambiguous   |   T0   |   T1   |   T2
 human               |   T2   |   T2   |   T3**
 ```
-\* independent per §3.3 · \*\* distinct verified identities; self-review = none
+\* independent per §3.3 · \*\* distinct canonical human actors; self-review = none
 
 ---
 
@@ -949,6 +989,21 @@ human               |   T2   |   T2   |   T3**
 - Schema evolution now uses a new predicate URI for any change that alters
   validation or interpretation; additive optional fields inside a closed
   emitted schema are not a compatibility mechanism.
+
+## Appendix G: Changes from v0.5
+
+- §2, §3.2, §4.2, §4.3, and §9 define canonical actors and require qualified
+  review before review evidence can raise trust (ADR-031).
+- T3 distinctness is evaluated on canonical human actors, not raw keys,
+  accounts, or other credential strings. Key rotation and account aliases do
+  not create additional accountable humans.
+- Qualified review requires an `approved` verdict, active approval at merge,
+  final-revision or final-diff binding, repository and merge-context binding,
+  and fail-closed treatment for stale, withdrawn, dismissed, wrong-revision, and
+  non-independent reviews.
+- The review/v0.2 successor predicate, which had not emitted bytes before this
+  decision, now carries the approval-state, coverage, merge-context, actor, and
+  agent-independence facts required for draft v0.6 review classification.
 
 ---
 

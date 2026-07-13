@@ -8,16 +8,18 @@ reference implementation treats them as acceptance tests, and any other implemen
 passing them.
 
 The Go reference implementation currently implements the draft v0.3 vector
-set. The v0.4/v0.5 range, policy-transition, and version-ancestry groups in this
-revision are the source contract for its next coordinated, digest-pinned update.
+set. The v0.4/v0.5/v0.6 range, policy-transition, version-ancestry, successor
+predicate, and qualified-review groups in this revision are the source contract
+for its next coordinated, digest-pinned update.
 
 Each vector is derived directly from a normative section of the spec and carries a `spec` back-reference to
 it. The vectors in this directory cover **level assignment** (§3.2, §3.3, §4.1–§4.2), **version precedence
 and tag grammar** (§7.1, §7.2), **aggregation** (§5.1–§5.2 scope partitioning and floors, §5.4 meta-paths,
 with §4.4 derivation re-leveling as it feeds §5.2), **transitive propagation** (§5.3, including SCC
 collapse), **release intervals and predecessor continuity** (§5.2), **policy transitions** (§5.4),
-**authenticated version ancestry** (§7.5), and **release decisions** (§6.1–§6.4 with §7.1 encoding). Every
-step of the spec's Appendix A worked example is reproduced as a vector (ids containing `appendix-a`).
+**authenticated version ancestry** (§7.5), **qualified review** (§4.3), and **release decisions** (§6.1–§6.4
+with §7.1 encoding). Every step of the spec's Appendix A worked example is reproduced as a vector (ids
+containing `appendix-a`).
 Cryptographic verification fixtures —
 vendored test keys, the allowed-signers registry, deterministically built fixture repositories, and SSH
 signature vectors (§4.2, §10 step 5) — live under [`crypto/`](crypto/README.md), which also documents the v1
@@ -35,6 +37,7 @@ capability limitation (SSH-only, with fail-closed behavior on other key families
 | `range.json` | Inception/adoption/recurring interval and predecessor-chain vectors | Apache 2.0 |
 | `version-ancestry.json` | Genesis/recurring/superseding version-state and exact-tag vectors | Apache 2.0 |
 | `policy-transition.json` | Bootstrap, previous-policy, meta-path, and delayed-activation vectors | Apache 2.0 |
+| `review-qualification.json` | Qualified-review, canonical-actor, final-revision, and agent-independence vectors | Apache 2.0 |
 | `crypto/` | Cryptographic fixtures: vendored test keys, allowed-signers registry, deterministic fixture-repo builder, SSH signature vectors (see `crypto/README.md`) | Apache 2.0 |
 | `check-conformance.py` (in `../scripts/`) | Independent validator for these files (self-check, not the harness) | Apache 2.0 |
 | `LICENSE` | Verbatim Apache 2.0 text, vendored so copies carry their license | Apache 2.0 |
@@ -46,21 +49,21 @@ against these vectors.
 
 ## `spec_version` pinning
 
-Every vector file carries a top-level `spec_version` (currently `"0.5"`). It names the spec draft the vectors
+Every vector file carries a top-level `spec_version` (currently `"0.6"`). It names the spec draft the vectors
 encode, not the version of the vector set. The rules:
 
-- The vectors track the pinned spec draft. When they say `"0.5"`, their expectations are those of
-  `spec/semver-trust.md` **Draft v0.5**.
+- The vectors track the pinned spec draft. When they say `"0.6"`, their expectations are those of
+  `spec/semver-trust.md` **Draft v0.6**.
 - All vector files in this directory MUST share the same `spec_version`; the validator enforces this and
   cross-checks it against the spec's draft header.
-- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.5 level and
+- An implementation claims conformance **against a `spec_version`** — "conforms to SemVer-Trust 0.6 level and
   precedence vectors" is the precise claim.
 
 The frozen v0.1 DSSE fixtures retain their v0.1 predicate bytes while their
-vector envelope is pinned to spec draft 0.5. Passing those vectors proves
+vector envelope is pinned to spec draft 0.6. Passing those vectors proves
 **backward verification** of historical v0.1 attestations only. It does not make
-v0.1 sufficient for a v0.5 release-conformance claim; §8.1 requires the v0.2
-successor predicate before v0.5 release emission.
+v0.1 sufficient for a v0.6 release-conformance claim; §8.1 requires the v0.2
+successor predicate before v0.6 release emission.
 
 The range, policy-transition, and version-ancestry files isolate independent
 dimensions for precise failures. Their authority fixtures are projections, not
@@ -77,7 +80,7 @@ Every vector file shares an envelope:
 ```json
 {
   "$comment": "SPDX-License-Identifier: Apache-2.0",
-  "spec_version": "0.5",
+  "spec_version": "0.6",
   "description": "…what this file covers…",
   "vectors": [ /* … */ ]
 }
@@ -88,7 +91,7 @@ Every vector, regardless of file, has these common fields:
 | Field | Type | Meaning |
 |---|---|---|
 | `id` | string | Stable, unique identifier, e.g. `levels/matrix/agent-none`. Never reused or repurposed. |
-| `kind` | string | Selects the consumption rule: `matrix`, `classify`, `precedence`, `grammar`, `scope_partition`, `scope_floor`, `meta_path`, `propagation`, `release_range`, `version_ancestry`, `policy_transition`, or `decision`. |
+| `kind` | string | Selects the consumption rule: `matrix`, `classify`, `precedence`, `grammar`, `scope_partition`, `scope_floor`, `meta_path`, `propagation`, `release_range`, `version_ancestry`, `policy_transition`, `review_qualification`, or `decision`. |
 | `description` | string | Human-readable intent; editorial, not asserted. |
 | `spec` | string | Back-reference to the governing spec section, e.g. `§3.2`. Never empty. |
 
@@ -287,6 +290,36 @@ Authority fixtures also carry concrete `mandatory_meta_paths` for
 attestation-generating workflows. Active and candidate policies must cover
 those paths; a candidate cannot remove that protection in-band.
 
+### `review-qualification.json` — kind: `review_qualification`
+
+Qualified-review classification (§4.3, ADR-031). These vectors operate after
+basic commit authorship classification and assert whether review facts count as
+`none`, `agent_independent`, or `human_distinct`, and therefore which level the
+commit receives.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `inputs.authorship.class` | string | Already-classified authorship: `agent`, `mixed`, `ambiguous`, or `human`. |
+| `inputs.authorship.actor` | string | Canonical actor id for the author or signer when one exists. |
+| `inputs.review.class` | string | Reviewer class: `human` or `agent`. |
+| `inputs.review.actor` | string | Canonical actor id for the reviewer. |
+| `inputs.review.credential_actor` | string | Canonical actor selected by mapping the review credential/platform account under the active actor profile. |
+| `inputs.review.verdict` | string | Forge/source-control verdict (`approved`, `changes_requested`, or `commented`). |
+| `inputs.review.approval_state` | string | Active-state fact (`active`, `withdrawn`, `dismissed`, or `stale`). |
+| `inputs.review.coverage` | string | `final_revision` or `final_diff`. |
+| `inputs.review.approved_revision` | string | Revision the approval names. |
+| `inputs.review.final_revision` | string | Final reviewed source revision. |
+| `inputs.review.approved_diff` / `result_diff` | string | Optional diff digests used for supported squash/rebase flows. |
+| `inputs.review.effective_at_merge` | bool | Whether source-control state still considered the approval effective at merge. |
+| `inputs.review.signed_attestation` | bool | Whether the review facts were captured in a signed attestation. |
+| `inputs.review.separate_context` | bool | Agent-review-only evidence of independent execution context. |
+| `inputs.merge.strategy` | string | `merge`, `squash`, or `rebase`. |
+| `inputs.merge.capture_mode` | string | `native` or `pre_rewrite`. |
+| `inputs.merge.post_approval_change` | bool | Whether source/target/result changed after approval without re-approval. |
+| `expected.review` | string | Counted review class: `none`, `agent_independent`, or `human_distinct`. |
+| `expected.level` | string | Resulting level under §3.2. |
+| `expected.reason` | string or null | Stable non-qualification category, or null when the review qualifies. |
+
 ### `decision.json` — kind: `decision`
 
 The §6.4 decision/rendering kernel (the illustrative policy; tuned tables are out of scope) with §6.1 semantic
@@ -318,6 +351,8 @@ the table says so, and unqualified on the T1/low cell.
 - **`classify`** — feed the raw `inputs` (signer identity class, trailers, policy, review facts) to the
   classifier; assert the derived authorship and review classes equal `expected.authorship` /
   `expected.review`, and the assigned level equals `expected.level`.
+- **`review_qualification`** — classify review facts under §4.3; assert the counted review class, level,
+  and non-qualification reason.
 - **`precedence`** — parse every string in `ordered`, sort by the implementation's SemVer precedence, and
   assert the sorted sequence equals `ordered`. Equivalently, assert each entry has strictly lower precedence
   than the next; equal precedence is a failure.
