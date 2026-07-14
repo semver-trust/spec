@@ -191,9 +191,9 @@ The design leans on ecosystem behaviors that were asserted from knowledge, not r
 | GitHub organization `semver-trust` | **Exists** (created July 2026). Pending: `.github` profile repo/README as the org front door. |
 | `spec` repository | **Active**; contains the draft v0.10 normative spec, design record, ADRs through ADR-035, predicate definitions, schemas, conformance vectors, consistency checks, governance files, and the dual-license arrangement. |
 | Normative spec | **Draft v0.10** at `spec/semver-trust.md`; Appendix C–K record the v0.2–v0.10 deltas. |
-| This document | Explanatory companion, revision r16. |
+| This document | Explanatory companion, revision r17. |
 | `TRADEMARK.md` | **Committed**; ecosystem naming, conformance claims, fork naming, and affiliation rules are documented. IP-counsel review remains advisable if traction arrives. |
-| `semver-trust-go` repository | **Implemented through draft v0.3**; consumes digest-pinned conformance artifacts and has published v0.1.0 and v0.2.0 as dogfood. Its legacy release path is not suitable for production claims; draft v0.10 trust-chain, successor-predicate, publishing-profile, and source-evidence behavior is pending implementation. |
+| `semver-trust-go` repository | **Conformance-aligned through draft v0.10**; consumes the digest-pinned v0.10 conformance suite and has published v0.1.0 and v0.2.0 as dogfood. Its legacy production release path is still not suitable for v0.10 production claims until the ported trust-chain, successor-predicate, publishing-profile, and source-evidence evaluators are wired into release and verify flows. |
 | Formal JSON Schemas for predicates | **Emitted at v0.1 and draft successor v0.2** under `schemas/`, with Apache 2.0 licensing and closed-object validation. Predicate v0.1 is historical; v0.2 carries the compatibility-critical successor bindings. |
 | Release/review predicate definitions | **Published at v0.1 and v0.2** under `release/` and `review/`; the first DSSE fixture emission occurred in spec PR #16 and remains v0.1 historical evidence. |
 | Conformance suite | **Implemented for draft v0.10**; covers level assignment, qualified review classification, precedence, release intervals/predecessors, policy bootstrap/transitions, authenticated version ancestry, propagation, aggregation, derivation-fail-closed behavior, thresholded decisions, ecosystem publishing-profile registry projection, source-evidence profile binding, commit signatures, DSSE attestation verification, successor predicate schema registration, unsigned v0.2 schema-instance fixtures, and signed positive v0.2 DSSE fixtures. |
@@ -279,6 +279,14 @@ Instructions to any agent (or human) resuming this work:
     freshness/equivocation semantics. `release/v0.2` remains schema-frozen; v0.10
     bindings use the declared extension map unless a future predicate URI adds
     first-class fields.
+28. **Reference implementation conformance catch-up:** `semver-trust-go` PRs
+    #79–#89 re-vendored the digest-pinned draft v0.10 suite and added enforced
+    consumers for the hardening groups: threshold decisions, release intervals,
+    policy transitions, authenticated version ancestry, qualified review,
+    source evidence, publishing profiles, and predicate-v0.2 schema/extension
+    checks. This satisfies the independent-consumer gate for spec issues #26 and
+    #29; production wiring remains implementation work tracked in
+    `semver-trust-go` #76.
 
 ---
 
@@ -302,3 +310,4 @@ Instructions to any agent (or human) resuming this work:
 | r14 | 2026-07-13 | Integrated ecosystem publishing profile hardening: ADR-034, draft v0.9, narrowed resolver-routing claims, deferred non-injective PyPI projection, clarified same-source promotion, artifact table, external-facts table, and timeline 26. |
 | r15 | 2026-07-13 | Integrated SLSA Source/source-evidence hardening: ADR-035, draft v0.10, source evidence profiles, replay vs trusted-issuer modes, subject/resource matching, freshness/equivocation semantics, source-evidence vectors, artifact table, and timeline 27. |
 | r16 | 2026-07-13 | Added adversarial publishing-profile conformance coverage for ADR-034/§7.4: Go prerelease fallback, npm latest/dist-tag behavior, Cargo prerelease opt-in, deferred/non-injective PyPI projection, registry-not-authority, and same-source promotion artifact claims. |
+| r17 | 2026-07-14 | Recorded `semver-trust-go` draft v0.10 conformance alignment through PRs #79–#89, satisfying the independent-consumer gate while leaving production release/verify wiring tracked separately. |

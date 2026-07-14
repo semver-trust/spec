@@ -48,11 +48,10 @@ decision is the way it is.
 
 The specification is a **v0.10 working draft**. The official Go
 implementation ([semver-trust-go](https://github.com/semver-trust/semver-trust-go))
-passes the draft v0.3 conformance suite and releases itself under the scheme
-(v0.1.0 and v0.2.0 are published, verified, reproducible dogfood). The legacy
-release path is not suitable for production claims until it consumes the v0.10
-successor-predicate, publishing-profile, and source-evidence conformance
-contract. Draft v0.4 added release-interval, policy-transition, and
+vendors and enforces the draft v0.10 conformance suite as of its v0.10
+alignment campaign. Its legacy production release path is still not suitable
+for v0.10 production claims until the ported evaluators are wired into release
+and verify flows. Draft v0.4 added release-interval, policy-transition, and
 authenticated version-ancestry vectors; draft v0.5 assigns successor
 release/review predicate types and schemas for the compatibility-critical state
 bindings; draft v0.6 adds qualified-review and canonical-actor conformance;

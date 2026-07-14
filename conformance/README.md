@@ -7,11 +7,10 @@ implementation under test, and asserts the implementation reproduces the encoded
 reference implementation treats them as acceptance tests, and any other implementation claims conformance by
 passing them.
 
-The Go reference implementation currently implements the draft v0.3 vector
-set. The v0.4–v0.10 range, policy-transition, version-ancestry, successor
-predicate, qualified-review, threshold-decision, derivation-fail-closed,
-publishing-profile, and source-evidence groups in this revision are the source
-contract for its next coordinated, digest-pinned update.
+The Go reference implementation vendors and enforces this draft v0.10 vector
+set. That proves an independent consumer for the conformance contract; wiring
+the ported v0.10 evaluators into the production release and verify paths remains
+implementation work, tracked in `semver-trust-go`.
 
 Each vector is derived directly from a normative section of the spec and carries a `spec` back-reference to
 it. The vectors in this directory cover **level assignment** (§3.2, §3.3, §4.1–§4.2), **version precedence
