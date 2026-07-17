@@ -41,6 +41,7 @@ are referenced from the specification's design record and elsewhere.
 | ADR-033 | [Executable derivation proofs are out of the portable baseline](0033-executable-derivation-proofs-are-out-of-the-portable-baseline.md) | Accepted (2026-07-13) |
 | ADR-034 | [Ecosystem publishing profiles constrain resolver-routing claims](0034-ecosystem-publishing-profiles-constrain-resolver-routing-claims.md) | Accepted (2026-07-13) |
 | ADR-035 | [Source evidence profiles consume SLSA Source with explicit verification mode](0035-source-evidence-profiles-consume-slsa-source-with-explicit-verification-mode.md) | Accepted (2026-07-13) |
+| ADR-036 | [Version-state digests use a reproducible canonical-JSON profile](0036-version-state-digests-use-a-reproducible-canonical-json-profile.md) | Proposed (2026-07-16) |
 
 ## Adding an ADR
 

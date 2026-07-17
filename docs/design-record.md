@@ -110,6 +110,7 @@ status.
 | ADR-033 | Executable derivation proofs are out of the portable baseline |
 | ADR-034 | Ecosystem publishing profiles constrain resolver-routing claims |
 | ADR-035 | Source evidence profiles consume SLSA Source with explicit verification mode |
+| ADR-036 | Version-state digests use a reproducible canonical-JSON profile |
 
 ## 5. Design review findings (QA record)
 

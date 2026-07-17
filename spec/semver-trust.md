@@ -727,8 +727,12 @@ repository-identity, graph, policy, actor-identity where applicable, and
 verification-time profiles. Successor schemas are closed except for declared
 extension maps; any change that alters validation or interpretation requires a
 new predicate URI and schema. Version-state identities in `release/v0.2` carry a digest plus a
-canonicalization profile; v0.2 emission is blocked until that profile is
-implemented by emitters and reproducible by verifiers.
+canonicalization profile. That profile is `semver-trust-version-state-json`
+(ADR-036): the accepted, carried-forward version state serialized with RFC 8785
+(JSON Canonicalization Scheme) and hashed with SHA-256, each state binding its
+predecessor's digest as a hash-chain link. Emitters MUST produce, and verifiers
+MUST reproduce, this digest from the authenticated version state; a mismatch
+aborts.
 
 Migration from v0.1 establishes a new authenticated v0.10 chain genesis. The
 bootstrap descriptor MAY independently pin a selected legacy `TO` as an included
