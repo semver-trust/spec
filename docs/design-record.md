@@ -111,6 +111,13 @@ status.
 | ADR-034 | Ecosystem publishing profiles constrain resolver-routing claims |
 | ADR-035 | Source evidence profiles consume SLSA Source with explicit verification mode |
 | ADR-036 | Version-state digests use a reproducible canonical-JSON profile |
+| ADR-037 | The bootstrap-family capability table bounds which command may write which path class |
+| ADR-038 | The bootstrap family generates and validates trust material; the human enrolls, commits, and signs |
+| ADR-039 | The bootstrap-family writer contract: atomic writes, dry-run purity, and a repo-relative path fence |
+| ADR-040 | The bootstrap family enforces two-key distinctness as a tool check without widening ADR-022 |
+| ADR-041 | No generator offers an adoption-boundary affordance; the boundary stays descriptor-pinned and hand-edited |
+| ADR-042 | Environment tooling uses the git binary; verification stays pure go-git |
+| ADR-043 | Attestation evidence is fetched by a non-force refspec; a push refspec is never written |
 
 ## 5. Design review findings (QA record)
 
