@@ -42,6 +42,13 @@ are referenced from the specification's design record and elsewhere.
 | ADR-034 | [Ecosystem publishing profiles constrain resolver-routing claims](0034-ecosystem-publishing-profiles-constrain-resolver-routing-claims.md) | Accepted (2026-07-13) |
 | ADR-035 | [Source evidence profiles consume SLSA Source with explicit verification mode](0035-source-evidence-profiles-consume-slsa-source-with-explicit-verification-mode.md) | Accepted (2026-07-13) |
 | ADR-036 | [Version-state digests use a reproducible canonical-JSON profile](0036-version-state-digests-use-a-reproducible-canonical-json-profile.md) | Proposed (2026-07-16) |
+| ADR-037 | [The bootstrap-family capability table bounds which command may write which path class](0037-the-bootstrap-family-capability-table-bounds-which-command-may-write-which-path-class.md) | Proposed (2026-07-21) |
+| ADR-038 | [The bootstrap family generates and validates trust material; the human enrolls, commits, and signs](0038-the-bootstrap-family-generates-and-validates-trust-material-the-human-enrolls-commits-and-signs.md) | Proposed (2026-07-21) |
+| ADR-039 | [The bootstrap-family writer contract: atomic writes, dry-run purity, and a repo-relative path fence](0039-the-bootstrap-family-writer-contract-atomic-writes-dry-run-purity-and-a-repo-relative-path-fence.md) | Proposed (2026-07-21) |
+| ADR-040 | [The bootstrap family enforces two-key distinctness as a tool check without widening ADR-022](0040-the-bootstrap-family-enforces-two-key-distinctness-as-a-tool-check-without-widening-adr-022.md) | Proposed (2026-07-21) |
+| ADR-041 | [No generator offers an adoption-boundary affordance; the boundary stays descriptor-pinned and hand-edited](0041-no-generator-offers-an-adoption-boundary-affordance-the-boundary-stays-descriptor-pinned-and-hand-edited.md) | Proposed (2026-07-21) |
+| ADR-042 | [Environment tooling uses the git binary; verification stays pure go-git](0042-environment-tooling-uses-the-git-binary-verification-stays-pure-go-git.md) | Proposed (2026-07-21) |
+| ADR-043 | [Attestation evidence is fetched by a non-force refspec; a push refspec is never written](0043-attestation-evidence-is-fetched-by-a-non-force-refspec-a-push-refspec-is-never-written.md) | Proposed (2026-07-21) |
 
 ## Adding an ADR
 
